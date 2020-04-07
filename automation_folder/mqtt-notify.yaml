@@ -1,0 +1,23 @@
+#----------------------------------------------------------------------------------------------------------
+# Trigger notification from MQTT
+#----------------------------------------------------------------------------------------------------------
+
+- alias: mqtt notify
+  initial_state: 'on'
+  hide_entity: True
+  trigger:
+    - platform: mqtt
+      topic: 'notify/rod'
+    - platform: mqtt
+      topic: 'notify/tom'
+  action:
+    - service_template: '{{(trigger.topic).replace("/",".")}}'
+      data_template:
+        message: '{{trigger.payload}}'
+        title: "Home Assistant"
+    - service: persistent_notification.create
+      data_template:
+        message: |
+          {{ trigger.payload }}
+          [{{ now().strftime("%Y-%m-%d %H:%M") }} {{ trigger.topic }}]
+        title: "Notification Sent"
