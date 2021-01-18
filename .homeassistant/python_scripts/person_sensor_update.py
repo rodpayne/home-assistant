@@ -63,14 +63,18 @@ if (triggeredEntity.find('sensor.') == 0) and (triggeredEntity.find('_status') >
   sensorName = "sensor." + personName + "_status"
   
   oldStateObject = hass.states.get(sensorName)
-  oldStatus = oldStateObject.state
+  oldStatus = oldStateObject.state.lower()
   oldAttributesObject = oldStateObject.attributes.copy()
   
   newStatus = data.get('state_change')
 
   logger.info("setting sensor name = {0}; old state = {3}; new state = {1}; from entity_id = {2}".format(sensorName,newStatus,triggeredEntity,oldStatus))
   
-  hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_' + newStatus.lower().replace(" ", "_"))
+  rest_command = 'homeseer_' + personName.lower() + '_' + newStatus.lower().replace(" ", "_")
+  try:
+    hass.services.call('rest_command', rest_command)
+  except:
+    logger.debug("rest_command {0} not defined".format(rest_command))
 
   hass.states.set(sensorName, newStatus, oldAttributesObject)
 
@@ -86,14 +90,17 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
   triggeredFrom = data.get('from_state')
   triggeredTo = data.get('to_state')
   
-  if 'account_name' in triggeredAttributesObject:
-    personName = triggeredAttributesObject['account_name']
+  if 'person_name' in triggeredAttributesObject:
+    personName = triggeredAttributesObject['person_name']
   else:
-    if 'person_name' in triggeredAttributesObject:
-      personName = triggeredAttributesObject['person_name']
+    if 'account_name' in triggeredAttributesObject:
+      personName = triggeredAttributesObject['account_name']
     else:
-      personName = ''
-      logger.debug("account_name (or person_name) attribute is missing") 
+      if 'owner_fullname' in triggeredAttributesObject:
+        personName = triggeredAttributesObject['owner_fullname'].split()[0].lower()
+      else:
+        personName = 'unknown'
+        logger.debug("account_name (or person_name) attribute is missing") 
   if 'source_type' in triggeredAttributesObject:
       sourceType = triggeredAttributesObject['source_type'] 
   else:
@@ -105,19 +112,25 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
   saveThisUpdate = False
 
   oldStateObject = hass.states.get(sensorName)
-  if oldStateObject == None:                                            # first time?
+
+  if triggeredTo == 'NotSet':
+    logger.debug("skipping because triggeredTo = {0}".format(triggeredFrom))
+  elif oldStateObject == None:                                            # first time?
     saveThisUpdate = True
     logger.debug("entity {0} does not yet exist (normal at startup)".format(sensorName))
-    oldStatus = 'None'
+    oldStatus = 'none'
   else:
-    oldStatus = oldStateObject.state
+    oldStatus = oldStateObject.state.lower()
     oldAttributesObject = oldStateObject.attributes.copy()
-    if sourceType == 'gps':                                               # gps device?  
+    if oldStatus == 'unknown':
+      saveThisUpdate = True
+      logger.debug("accepting the first update")
+    elif sourceType == 'gps':                                               # gps device?  
       if triggeredTo != triggeredFrom:                                      # did it change zones?
         saveThisUpdate = True                                                 # gps changing zones is assumed to be new, correct info
       else:
-        if oldAttributesObject['entity_id'] == triggeredEntity:           # same entity as we are following?
-          saveThisUpdate = True
+        if not('entity_id' in oldAttributesObject) or not('reported_state' in oldAttributesObject) or oldAttributesObject['entity_id'] == triggeredEntity:           # same entity as we are following?
+          saveThisUpdate = True                                           # same tracker as we are following (or this it the first one)
         elif triggeredStatus == oldAttributesObject['reported_state']:    # same status as the one we are following?
           if 'gps_accuracy' in triggeredAttributesObject and 'gps_accuracy' in oldAttributesObject:
             if triggeredAttributesObject['gps_accuracy'] < oldAttributesObject['gps_accuracy']:     # better choice?
@@ -126,10 +139,10 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
     else:                                                                 # source = router or ping
       if triggeredTo != triggeredFrom:                                      # did it change state?
           if triggeredStatusHomeAway == 'Home':                                 # reporting Home
-            if oldStatus.lower() != 'home':                                       # no additional information if already Home
+            if oldStatus != 'home':                                       # no additional information if already Home
               saveThisUpdate = True
           else:                                                                 # reporting Away
-            if oldStatus.lower() == 'home':                                       # no additional information if already Away
+            if oldStatus == 'home':                                       # no additional information if already Away
               saveThisUpdate = True
 
   if saveThisUpdate == True:
@@ -152,7 +165,6 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
       newAttributesObject['icon'] = zoneAttributesObject['icon']
     else:
       newAttributesObject['icon'] = 'mdi:help-circle'
-
     ha_just_startedObject = hass.states.get('automation.ha_just_started')
     ha_just_started = ha_just_startedObject.state
     if ha_just_started == 'on':
@@ -161,36 +173,48 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
 # Set up something like https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/  
 
     if triggeredStatusHomeAway == 'Home':
-      if oldStatus.lower() == 'none' or ha_just_started == 'on':
+      if oldStatus == 'none' or ha_just_started == 'on' or oldStatus == 'just left':
         newStatus = 'Home'
-        hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_home')
-      elif oldStatus == 'Just Left':
+        try:
+          hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_home')
+        except:
+          logger.debug("rest_command homeseer_{0}_home not defined".format(personName.lower()))
+      elif oldStatus == 'home':
         newStatus = 'Home'
-        hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_home')
-      elif oldStatus.lower() == 'home':
-        newStatus = 'Home'
-      elif oldStatus == 'Just Arrived': 
+      elif oldStatus == 'just arrived': 
         newStatus = 'Just Arrived'
       else:
         newStatus = 'Just Arrived'
-        hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_just_arrived')
+        try:
+          hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_just_arrived')
+        except:
+          logger.debug("rest_command homeseer_{0}_just_arrived not defined".format(personName.lower()))
 #        if personName.lower() == 'rod':
 #          hass.services.call('notify', 'ios_rods_iphone_app', {"message": "Welcome Home " + string.capwords(personName),"data": {"push": {"sound": "US-EN-Morgan-Freeman-Welcome-Home.wav"}}})
 #          hass.services.call('media_player', 'alexa', {"entity_id": "media_player.kitchen", "message": string.capwords(personName) + ", Welcome Home!"})
 #        hass.services.call('mqtt', 'publish', { "topic": "homeassistant/kitchen_tts", "payload": string.capwords(personName) + ", Welcome Home!" })
     else:
-      if oldStatus.lower() == 'none' or ha_just_started == 'on':
+      if oldStatus == 'none' or ha_just_started == 'on':
         newStatus = 'Away'
-        hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_away')
-      elif oldStatus == 'Just Left':
+        try:
+          hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_away')
+        except:
+          logger.debug("rest_command homeseer_{0}_away not defined".format(personName.lower()))
+      elif oldStatus == 'just left':
         newStatus = 'Just Left'
-      elif oldStatus.lower() == 'home' or oldStatus == 'Just Arrived':
+      elif oldStatus == 'home' or oldStatus == 'just arrived':
         newStatus = 'Just Left'
-        hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_just_left')
+        try:
+          hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_just_left')
+        except:
+          logger.debug("rest_command homeseer_{0}_just_left not defined".format(personName.lower()))
       else:
         newStatus = 'Away'
-        hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_away')
+        try:
+          hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_away')
+        except:
+          logger.debug("rest_command homeseer_{0}_away not defined".format(personName.lower()))
     
-    logger.info("setting sensor name = {0}; oldStatus = {3}; newStatus = {1}; friendly_name = {2}".format(sensorName,newStatus,newAttributesObject['friendly_name'],oldStatus))
+    logger.info("setting sensor name = {0}; oldStatus = {3}; newStatus = {1}; friendly_name = {2}; icon = {4}".format(sensorName,newStatus,newAttributesObject['friendly_name'],oldStatus,newAttributesObject['icon']))
 
     hass.states.set(sensorName, newStatus, newAttributesObject)

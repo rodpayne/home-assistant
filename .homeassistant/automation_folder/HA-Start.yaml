@@ -1,0 +1,77 @@
+#----------------------------------------------------------------------------------------------------------
+# These actions are taken when Home Assistant starts up.
+#----------------------------------------------------------------------------------------------------------
+
+- alias: HA Start
+  initial_state: 'on'
+  trigger:
+    platform: homeassistant
+    event: start
+  action:
+    - service: automation.turn_on
+      data_template:
+        entity_id: 'automation.ha_just_started'
+    - service: persistent_notification.create
+      data_template:
+        message: >
+          Home Assistant was started {{ now().strftime("%Y-%m-%d %H:%M") }}
+        title: "Home Assistant"
+# - create person sensors to pretty things up until the update happens
+    - service: python_script.set_state
+      data_template:
+        entity_id: 'sensor.rod_status'
+        state: 'Unknown'
+        friendly_name: 'Rod (HA restarted)'
+        person_name: 'Rod'
+        allow_create: True
+    - service: python_script.set_state
+      data_template:
+        entity_id: 'sensor.pam_status'
+        state: 'Unknown'
+        friendly_name: 'Pam (HA restarted)'
+        person_name: 'Pam'
+        allow_create: True
+# - restart the Ecobee timeout monitor
+    - service: automation.trigger
+      data_template:
+        entity_id: automation.reset_hvac_operation_minute_counter
+# - typically comment out the following service when doing a lot of restarts
+    - service: notify.alexa_media
+      data_template:
+        target: 
+          - media_player.byu_oit
+        data:
+          type: tts
+        message: 'Home Assistant just started.'
+
+#----------------------------------------------------------------------------------------------------------
+# The state of 'automation.ha_just_started' can be tested from a script to see if we are initializing.
+#----------------------------------------------------------------------------------------------------------
+- alias: HA Just Started
+  initial_state: 'off'
+  trigger:
+    platform: state
+    entity_id: automation.ha_just_started 
+    to: 'on'    
+    for:
+      minutes: 3
+  action:
+    service: automation.turn_off
+    data_template:
+      entity_id: 'automation.ha_just_started'
+
+#----------------------------------------------------------------------------------------------------------
+# Turn this automation on to restart the system overnight Monday morning.
+#----------------------------------------------------------------------------------------------------------
+- alias: Home Assistant Scheduled Restart
+  initial_state: 'off'
+  trigger:
+    platform: time
+    at: '03:30:30'
+  condition:
+    condition: time
+    weekday:
+      - mon
+  action:
+    service: homeassistant.restart
+
