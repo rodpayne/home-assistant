@@ -12,7 +12,7 @@
 #    Output: 
 #            - updated "sensor.<personName>_status" with <personName>'s location and status:
 #              Attributes:
-#              - all attributes from last triggered device tracker
+#              - selected attributes from last triggered device tracker
 #              - state: "Just Arrived", "Home", "Just Left", "Away", or "Extended Away"
 #              - person_name: <personName>
 #              - entity_id: entity_id of the device tracker that triggered the automation
@@ -119,6 +119,7 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
     saveThisUpdate = True
     logger.debug("entity {0} does not yet exist (normal at startup)".format(sensorName))
     oldStatus = 'none'
+    oldAttributesObject = {}
   else:
     oldStatus = oldStateObject.state.lower()
     oldAttributesObject = oldStateObject.attributes.copy()
@@ -148,7 +149,31 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
   if saveThisUpdate == True:
     logger.debug("account_name/personName = {0}; triggeredFrom = {1}; triggeredTo = {2}; source_type = {3}".format(personName,triggeredFrom,triggeredTo,sourceType))
     newStatus = triggeredStatusHomeAway
-    newAttributesObject = triggeredAttributesObject
+#    newAttributesObject = triggeredAttributesObject
+#   Be more selective about attributes carried in the sensor:
+    newAttributesObject = oldAttributesObject
+    if 'source_type' in triggeredAttributesObject:
+      newAttributesObject['source_type'] = triggeredAttributesObject['source_type']
+    else:
+      if 'source_type' in newAttributesObject:
+        newAttributesObject.pop('source_type')
+    if 'latitude' in triggeredAttributesObject:
+      newAttributesObject['latitude'] = triggeredAttributesObject['latitude']
+    if 'longitude' in triggeredAttributesObject:
+      newAttributesObject['longitude'] = triggeredAttributesObject['longitude']
+    if 'gps_accuracy' in triggeredAttributesObject:
+      newAttributesObject['gps_accuracy'] = triggeredAttributesObject['gps_accuracy']
+    else:
+      if 'gps_accuracy' in newAttributesObject:
+        newAttributesObject.pop('gps_accuracy')
+    if 'altitude' in triggeredAttributesObject:
+      newAttributesObject['altitude'] = triggeredAttributesObject['altitude']
+    if 'vertical_accuracy' in triggeredAttributesObject:
+      newAttributesObject['vertical_accuracy'] = triggeredAttributesObject['vertical_accuracy']
+    else:
+      if 'vertical_accuracy' in newAttributesObject:
+        newAttributesObject.pop('vertical_accuracy')
+
     newAttributesObject['entity_id'] = triggeredEntity
     newAttributesObject['reported_state'] = triggeredStatus
     newAttributesObject['person_name'] = string.capwords(personName) 
@@ -215,6 +240,8 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
         except:
           logger.debug("rest_command homeseer_{0}_away not defined".format(personName.lower()))
     
-    logger.info("setting sensor name = {0}; oldStatus = {3}; newStatus = {1}; friendly_name = {2}; icon = {4}".format(sensorName,newStatus,newAttributesObject['friendly_name'],oldStatus,newAttributesObject['icon']))
+    logger.info("setting sensor name = {0}; oldStatus = {1}; newStatus = {2}".format(sensorName,oldStatus,newStatus))
 
     hass.states.set(sensorName, newStatus, newAttributesObject)
+
+    logger.debug(newAttributesObject)
