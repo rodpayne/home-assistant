@@ -1,0 +1,8 @@
+{
+  "domain": "person_sensor_update",
+  "name": "Person Sensor Update",
+  "documentation": "https://github.com/",
+  "dependencies": ["sensor","zone"],
+  "codeowners": ["@rodpayne"],
+  "requirements": []
+}

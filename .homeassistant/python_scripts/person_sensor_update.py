@@ -18,6 +18,7 @@
 #              - entity_id: entity_id of the device tracker that triggered the automation
 #              - reported_state: the state reported by device tracker = "Home", "Away", or <zone>
 #              - friendly_name: something like "Rod (i.e. Rod's watch) is at Drew's"
+#              - icon: the icon that correspondes with the current zone
 #            - call rest_command service to update HomeSeer: 'homeseer_<personName>_<state>'
 #
 #==================================================================================================
@@ -133,10 +134,12 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
         if not('entity_id' in oldAttributesObject) or not('reported_state' in oldAttributesObject) or oldAttributesObject['entity_id'] == triggeredEntity:           # same entity as we are following?
           saveThisUpdate = True                                           # same tracker as we are following (or this it the first one)
         elif triggeredStatus == oldAttributesObject['reported_state']:    # same status as the one we are following?
-          if 'gps_accuracy' in triggeredAttributesObject and 'gps_accuracy' in oldAttributesObject:
-            if triggeredAttributesObject['gps_accuracy'] < oldAttributesObject['gps_accuracy']:     # better choice?
-              saveThisUpdate = True
-              logger.debug("gps_accuracy is better")
+          if not('vertical_accuracy' in oldAttributesObject) or ('vertical_accuracy' in triggeredAttributesObject and (triggeredAttributesObject['vertical_accuracy'] > 0 and oldAttributesObject['vertical_accuracy'] == 0)):     # better choice based on accuracy?
+            saveThisUpdate = True
+            logger.debug("vertical_accuracy is better")
+          if 'gps_accuracy' in triggeredAttributesObject and 'gps_accuracy' in oldAttributesObject and triggeredAttributesObject['gps_accuracy'] < oldAttributesObject['gps_accuracy']:     # better choice based on accuracy?
+            saveThisUpdate = True
+            logger.debug("gps_accuracy is better")
     else:                                                                 # source = router or ping
       if triggeredTo != triggeredFrom:                                      # did it change state?
           if triggeredStatusHomeAway == 'Home':                                 # reporting Home
@@ -149,8 +152,7 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
   if saveThisUpdate == True:
     logger.debug("account_name/personName = {0}; triggeredFrom = {1}; triggeredTo = {2}; source_type = {3}".format(personName,triggeredFrom,triggeredTo,sourceType))
     newStatus = triggeredStatusHomeAway
-#    newAttributesObject = triggeredAttributesObject
-#   Be more selective about attributes carried in the sensor:
+#   Be selective about attributes carried in the sensor:
     newAttributesObject = oldAttributesObject
     if 'source_type' in triggeredAttributesObject:
       newAttributesObject['source_type'] = triggeredAttributesObject['source_type']
@@ -167,7 +169,7 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
       if 'gps_accuracy' in newAttributesObject:
         newAttributesObject.pop('gps_accuracy')
     if 'altitude' in triggeredAttributesObject:
-      newAttributesObject['altitude'] = triggeredAttributesObject['altitude']
+      newAttributesObject['altitude'] = round(triggeredAttributesObject['altitude'],0)
     if 'vertical_accuracy' in triggeredAttributesObject:
       newAttributesObject['vertical_accuracy'] = triggeredAttributesObject['vertical_accuracy']
     else:
@@ -180,11 +182,18 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
     newAttributesObject['update_time'] = str(datetime.datetime.now())
 
     if triggeredStatus == 'Away' or triggeredStatus.lower() == 'on':
-      newAttributesObject['friendly_name'] = "{0} (i.e. {1}) is {2}".format(string.capwords(personName),triggeredFriendlyName,triggeredStatus) 
+      friendly_name = "{0} ({1}) is {2}".format(string.capwords(personName),triggeredFriendlyName,triggeredStatus) 
+      template = "{0} ({1}) is in <locality>".format(string.capwords(personName),triggeredFriendlyName)
     else:
-      newAttributesObject['friendly_name'] = "{0} (i.e. {1}) is at {2}".format(string.capwords(personName),triggeredFriendlyName,triggeredStatus) 
+      friendly_name = "{0} ({1}) is at {2}".format(string.capwords(personName),triggeredFriendlyName,triggeredStatus) 
+      template = friendly_name
+    newAttributesObject['friendly_name'] = friendly_name
 
-    zoneStateObject = hass.states.get('zone.' + triggeredStatus)
+    if 'zone' in triggeredAttributesObject:
+      zoneEntityID = 'zone.' + triggeredAttributesObject['zone']
+    else:
+      zoneEntityID = 'zone.' + triggeredStatus.lower().replace(' ','_').replace("'",'_')
+    zoneStateObject = hass.states.get(zoneEntityID)
     if zoneStateObject != None:
       zoneAttributesObject = zoneStateObject.attributes.copy()
       newAttributesObject['icon'] = zoneAttributesObject['icon']
@@ -214,10 +223,6 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
           hass.services.call('rest_command', 'homeseer_' + personName.lower() + '_just_arrived')
         except:
           logger.debug("rest_command homeseer_{0}_just_arrived not defined".format(personName.lower()))
-#        if personName.lower() == 'rod':
-#          hass.services.call('notify', 'ios_rods_iphone_app', {"message": "Welcome Home " + string.capwords(personName),"data": {"push": {"sound": "US-EN-Morgan-Freeman-Welcome-Home.wav"}}})
-#          hass.services.call('media_player', 'alexa', {"entity_id": "media_player.kitchen", "message": string.capwords(personName) + ", Welcome Home!"})
-#        hass.services.call('mqtt', 'publish', { "topic": "homeassistant/kitchen_tts", "payload": string.capwords(personName) + ", Welcome Home!" })
     else:
       if oldStatus == 'none' or ha_just_started == 'on':
         newStatus = 'Away'
@@ -243,5 +248,19 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
     logger.info("setting sensor name = {0}; oldStatus = {1}; newStatus = {2}".format(sensorName,oldStatus,newStatus))
 
     hass.states.set(sensorName, newStatus, newAttributesObject)
-
     logger.debug(newAttributesObject)
+
+#--------------------------------------------------------------------------------------------------
+# Call service to "reverse geocode" the location:
+# - determine <locality> for friendly_name
+# - record full location in OSM_location
+# - calculate other location-based statistics, such as distance_from_home
+# For devices at Home, this will only be done initially or on arrival (newStatus = 'Just Arrived')
+#--------------------------------------------------------------------------------------------------
+    if newStatus != 'Home' or ha_just_started == 'on':
+      try:
+        service_data = {"entity_id": sensorName, "template": template}
+        hass.services.call("person_sensor_update", "reverse_geocode", service_data, True)
+        logger.debug("person_sensor_update reverse_geocode service call completed")
+      except Exception as e:
+        logger.debug("person_sensor_update reverse_geocode service call exception: {0}".format(str(e)))
