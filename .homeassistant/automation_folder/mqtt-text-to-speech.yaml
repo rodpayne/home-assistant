@@ -4,46 +4,15 @@
 
 - alias: mqtt TTS
   initial_state: 'on'
-  hide_entity: True
+  mode: queued
+  max: 10
   trigger:
     - platform: mqtt
-      topic: 'speak/kitchen'
-    - platform: mqtt
-      topic: 'speak/byu_oit'
-    - platform: mqtt
-      topic: 'speak/living_room'
-    - platform: mqtt
-      topic: 'speak/sewing_room'
-    - platform: mqtt
-      topic: 'speak/upstairs_hallway'
-    - platform: mqtt
-      topic: 'speak/everywhere'
+      topic: 'speak/#'
   action:
     - service: notify.alexa_media
       data_template:
-        target: '{{(trigger.topic).replace("speak/","media_player.")}}'
-        data:
-          type: tts
-        message: '{{trigger.payload}}'
-    - service: persistent_notification.create
-      data_template:
-        message: |
-          {{ trigger.payload }} 
-          [{{ now().strftime("%Y-%m-%d %H:%M") }} {{ trigger.topic }}]
-        title: "Spoken Message"
-
-- alias: mqtt TTS Basement
-  initial_state: 'on'
-  hide_entity: True
-  trigger:
-    - platform: mqtt
-      topic: 'speak/basement 1'
-    - platform: mqtt
-      topic: 'speak/basement 2'
-  action:
-    - service: notify.alexa_media
-      data_template:
-        target: '{{(trigger.topic).replace("speak/basement ","media_player.thing_")}}'
+        target: '{{ (trigger.topic).replace("speak/","media_player.").replace("media_player.basement ","media_player.thing_").replace("_tts","") }}'
         data:
           type: tts
         message: '{{trigger.payload}}'
