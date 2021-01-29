@@ -21,7 +21,7 @@ THROTTLE_INTERVAL = timedelta(seconds=1)
 
 _LOGGER = logging.getLogger(__name__)
 
-METERS_PER_MILE = 3030.064
+METERS_PER_MILE = 1609.34
 
 def setup(hass, config):
     """Set up is called when Home Assistant is loading our component."""
@@ -109,7 +109,7 @@ def setup(hass, config):
                         if new_latitude == 'None' or new_longitude == 'None':
                             _LOGGER.info("(" + entity_id + ") Skipping geocoding because coordinates are missing")
                         elif distance_traveled < 10 and old_latitude != 'None' and old_longitude != 'None':
-                            _LOGGER.info("(" + entity_id + ") Skipping geocoding because distance < 10")
+                            _LOGGER.info("(" + entity_id + ") Skipping geocoding because distance_traveled < 10")
                         else:
 
                             if 'update_time' in targetAttributesObject:
@@ -126,10 +126,18 @@ def setup(hass, config):
     
                             elapsed_time = new_update_time - old_update_time
                             _LOGGER.debug("(" + entity_id + ") elapsed_time = " + str(elapsed_time))
+                            elapsed_seconds = elapsed_time.total_seconds()
+                            _LOGGER.debug("(" + entity_id + ") elapsed_seconds = " + str(elapsed_seconds))
+                            
+                            if elapsed_seconds > 0:
+                                speed_during_interval = distance_traveled / elapsed_seconds
+                                _LOGGER.debug("(" + entity_id + ") speed_during_interval = " + str(speed_during_interval) + " meters/sec")
+                            else:
+                                speed_during_interval = 0
                             
                             old_distance_from_home = 0
-                            if 'distance_from_home' in targetAttributesObject:
-                                old_distance_from_home = float(targetAttributesObject['distance_from_home'])
+                            if 'meters_from_home' in targetAttributesObject:
+                                old_distance_from_home = float(targetAttributesObject['meters_from_home'])
                             
                             if 'reported_state' in targetAttributesObject and targetAttributesObject['reported_state'].lower() == 'home':
                                 distance_from_home = 0          # clamp it down since "Home" is not a single point
@@ -137,11 +145,11 @@ def setup(hass, config):
                                 distance_from_home = round(distance(float(new_latitude), float(new_longitude), float(home_latitude), float(home_longitude)),3)
                             else:
                                 distance_from_home = 0          # could only happen if we don't have coordinates
-                            _LOGGER.debug("(" + entity_id + ") distance_from_home = " + str(distance_from_home))
-                            targetAttributesObject['distance_from_home'] = str(round(distance_from_home,1))
+                            _LOGGER.debug("(" + entity_id + ") meters_from_home = " + str(distance_from_home))
+                            targetAttributesObject['meters_from_home'] = str(round(distance_from_home,1))
                             targetAttributesObject['miles_from_home'] = str(round(distance_from_home / METERS_PER_MILE,1))
 
-                            if distance_traveled <= 20:
+                            if speed_during_interval <= 0.5:
                                 direction = "stationary"
                             elif old_distance_from_home > distance_from_home:
                                 direction = "toward home"
@@ -201,22 +209,43 @@ def setup(hass, config):
                                 targetAttributesObject['attribution'] = osm_decoded["licence"] 
 
 
-        #                    """Try the WazeRouteCalculator"""
-        #                    if distance_from_home == 0:
-        #                        routeTime = 0
-        #                        routeDistance = 0
-        #                    else:
-        #                        import WazeRouteCalculator
-        #                        from_address = "lat=" + str(new_latitude) + " lng=" + str(new_longitude)
-        #                        to_address = "lat=" + str(home_latitude) + " lng=" + str(home_longitude)
-        #                        region = "US"
-        #                        route = WazeRouteCalculator.WazeRouteCalculator(from_address, to_address, region)
-        #                        routeTime, routeDistance = route.calc_route_info()
-        #                    _LOGGER.debug("(" + entity_id + ") Waze routeTime " + str(routeTime) )
-        #                    targetAttributesObject['driving_time'] = str(round(routeTime,2))
-        #                    _LOGGER.debug("(" + entity_id + ") Waze routeDistance " + str(routeDistance) )
-        #                    targetAttributesObject['driving_distance'] = str(round(routeDistance,2))
-
+                            """WazeRouteCalculator"""
+                            if distance_from_home == 0:
+                                routeTime = 0
+                                routeDistance = 0
+                                targetAttributesObject['driving_miles'] = '0'
+                                targetAttributesObject['driving_minutes'] = '0'
+                            else:
+                                _LOGGER.debug("(" + entity_id + ") Waze calculation" )
+                                import WazeRouteCalculator
+                                from_address = str(new_latitude) + "," + str(new_longitude)
+                                to_address = str(home_latitude) + "," + str(home_longitude)
+                                region = "US"
+                                try:
+                                    route = WazeRouteCalculator.WazeRouteCalculator(from_address, to_address, region)
+                                    routeTime, routeDistance = route.calc_route_info()
+                                    _LOGGER.debug("(" + entity_id + ") Waze routeDistance " + str(routeDistance) )  # km
+                                    routeDistance = routeDistance * 1000 / METERS_PER_MILE                          # miles
+                                    if routeDistance >= 100:
+                                        targetAttributesObject['driving_miles'] = str(round(routeDistance,0))
+                                    elif routeDistance >= 10:
+                                        targetAttributesObject['driving_miles'] = str(round(routeDistance,1))
+                                    else:
+                                        targetAttributesObject['driving_miles'] = str(round(routeDistance,2))
+                                    _LOGGER.debug("(" + entity_id + ") Waze routeTime " + str(routeTime) )          # minutes
+                                    targetAttributesObject['driving_minutes'] = str(round(routeTime,1))
+                                    targetAttributesObject['attribution'] = targetAttributesObject['attribution' ] + '; Data by Waze App. https://waze.com' 
+                                except Exception as e:
+                                    _LOGGER.error("(" + entity_id + ") Waze Exception - " + str(e))
+                                    _LOGGER.debug(traceback.format_exc())
+                                    if 'api_error_count' in apiAttributesObject:
+                                        wazeErrorCount = apiAttributesObject['waze_error_count']
+                                    else:
+                                        wazeErrorCount = 0
+                                    apiAttributesObject['waze_error_count'] = wazeErrorCount + 1
+                                    hass.states.set(API_STATE_OBJECT, apiStatus, apiAttributesObject)
+                                    targetAttributesObject.pop('driving_miles')
+                                    targetAttributesObject.pop('driving_minutes')
 
                         _LOGGER.debug("(" + entity_id + ") Setting " + entity_id)
                         hass.states.set(entity_id,targetStatus,targetAttributesObject)
