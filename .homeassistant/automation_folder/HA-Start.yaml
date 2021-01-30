@@ -48,7 +48,7 @@
           - media_player.byu_oit
         data:
           type: tts
-          message: 'Home Assistant just started.'
+        message: 'Home Assistant just started.'
 
 #----------------------------------------------------------------------------------------------------------
 # The state of 'automation.ha_just_started' can be tested from a script to see if we are initializing.
