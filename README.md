@@ -3,13 +3,26 @@
 ## **Set State**
 Python Script to set the state or other attributes for the specified entity.
 
-Excellent documentation available in (https://github.com/xannor/hass_py_set_state) readme.
+Excellent documentation and HACS installation available from (https://github.com/xannor/hass_py_set_state) readme.
 
+### **Manual Installation Hints**
+1. Create `<config>/python_scripts` folder if you haven't already.
 
-## **Presence Detection not so Binary**
-When a person is detected as moving between Home and Away, instead of going straight to Home or Away, it will temporarily change the person's status to Just Arrived or Just Left so that automations can be triggered appropriately.
+2. Copy `set_state.py` into the `<config>/python_scripts` folder.
+
+3. Add `python_script:` to `<config>/configuration.yaml` if you haven't already.
+
+4. Restart Home Assistant.
+
+## **Person Sensor**
+This custom integration will look at all device trackers for a particular person and combine them into a single person sensor, `sensor.<name>_status`. Device tracker state changes are monitored rather than averaging the states or calculating a probability.
+
+Optionally, when the person sensor changes it can be reverse geocoded using Open Street Maps and the distance from home (miles and minutes) calculated with `WazeRouteCalculator`.
+
+When a person is detected as moving between `Home` and `Away`, instead of going straight to `Home` or `Away`, this will temporarily change the person's status to `Just Arrived` or `Just Left` so that automations can be triggered appropriately.
 
 ![Person State Diagram](docs/images/PersonHomeState.png)
 
-[Person Detection Details](docs/PersonDetection.md) *Inspired by <https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/>* 
+*Inspired by <https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/>* 
 
+### [Go to Person Detection Details](docs/PersonDetection.md#table-of-contents)
