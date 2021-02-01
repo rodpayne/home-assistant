@@ -1,8 +1,13 @@
 {
   "domain": "person_sensor_update",
   "name": "Person Sensor Update",
-  "documentation": "https://github.com/",
+  "documentation": "https://github.com/rodpayne/home-assistant",
   "dependencies": ["sensor","zone"],
   "codeowners": ["@rodpayne"],
-  "requirements": []
+  "requirements": [
+    "datetime",
+    "integrationhelper",
+    "voluptuous"
+  ],
+  "version": "2021.02.01"
 }
