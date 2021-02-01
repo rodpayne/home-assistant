@@ -4,10 +4,13 @@
 
 - alias: mqtt notify
   initial_state: 'on'
-  hide_entity: True
+  mode: queued
+  max: 10
   trigger:
     - platform: mqtt
       topic: 'notify/rod'
+    - platform: mqtt
+      topic: 'notify/pam'
     - platform: mqtt
       topic: 'notify/tom'
   action:

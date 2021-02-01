@@ -85,7 +85,7 @@ if (triggeredEntity.find('sensor.') == 0) and (triggeredEntity.find('_status') >
 # Is triggeredEntity like "sensor.ford_focus_location" ?
 #--------------------------------------------------------------------------------------------------
 # - assumption is that the last device to change zone state is an indicator of where a person is,
-#   because devices left at home should not change zones
+#   because devices left at home should not change zones.
 #--------------------------------------------------------------------------------------------------
 elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('binary_sensor.') == 0) or (triggeredEntity.find('sensor.') == 0):
   triggeredFrom = data.get('from_state')
@@ -93,15 +93,13 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
   
   if 'person_name' in triggeredAttributesObject:
     personName = triggeredAttributesObject['person_name']
+  elif 'account_name' in triggeredAttributesObject:
+    personName = triggeredAttributesObject['account_name']
+  elif 'owner_fullname' in triggeredAttributesObject:
+    personName = triggeredAttributesObject['owner_fullname'].split()[0].lower()
   else:
-    if 'account_name' in triggeredAttributesObject:
-      personName = triggeredAttributesObject['account_name']
-    else:
-      if 'owner_fullname' in triggeredAttributesObject:
-        personName = triggeredAttributesObject['owner_fullname'].split()[0].lower()
-      else:
-        personName = 'unknown'
-        logger.debug("account_name (or person_name) attribute is missing") 
+    personName = triggeredEntity.split('.')[1].split('_')[0].lower()
+    logger.warning('account_name (or person_name) attribute is missing, trying "{0}"'.format(person_name)) 
   if 'source_type' in triggeredAttributesObject:
       sourceType = triggeredAttributesObject['source_type'] 
   else:
@@ -259,7 +257,7 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
 #--------------------------------------------------------------------------------------------------
     if newStatus != 'Home' or ha_just_started == 'on':
       try:
-        service_data = {"entity_id": sensorName, "template": template}
+        service_data = {"entity_id": sensorName, "friendly_name_template": template}
         hass.services.call("person_sensor_update", "reverse_geocode", service_data, True)
         logger.debug("person_sensor_update reverse_geocode service call completed")
       except Exception as e:

@@ -20,14 +20,6 @@
     - service: automation.trigger
       data_template:
         entity_id: automation.reset_hvac_operation_minute_counter
-# - typically comment out the following service when doing a lot of restarts
-    - service: notify.alexa_media
-      data_template:
-        target: 
-          - media_player.byu_oit
-        data:
-          type: tts
-        message: 'Home Assistant just started.'
 # - create person sensors to pretty things up until the update happens
     - service: python_script.set_state
       data_template:
@@ -45,10 +37,18 @@
         allow_create: True
 # - Update person sensors after device_tracker has been created
     - delay:
-        minutes: 1
+        seconds: 30
     - service: device_tracker.icloud3_update
       data_template:
         command: location
+# - typically comment out the following service when doing a lot of restarts
+    - service: notify.alexa_media
+      data_template:
+        target: 
+          - media_player.byu_oit
+        data:
+          type: tts
+        message: 'Home Assistant just started.'
 
 #----------------------------------------------------------------------------------------------------------
 # The state of 'automation.ha_just_started' can be tested from a script to see if we are initializing.
