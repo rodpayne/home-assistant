@@ -4,7 +4,7 @@
 
 * [Objectives](#objectives)
   * [Combine the status of multiple device trackers](#combine-the-status-of-multiple-device-trackers)
-  * [Make presence detection not so binary](#making-presence-detection-not-so-binary)
+  * [Make presence detection not so binary](#make-presence-detection-not-so-binary)
   * [Reverse geocode the location and make calculations](#reverse-geocode-the-location-and-make-calculations)
 * [Components](#components)
   * [File automation_folder/presence-detection.yaml](#file-automation_folderpresence-detectionyaml)
@@ -16,6 +16,9 @@
       * [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
     * [Google Maps Geocoding](#google-maps-geocoding)
       * [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)
+* [Installation](#installation)   
+  * [Manual installation hints](#manual-installation-hints) 
+  * [Configuration parameters](#configuration-parameters)  
 * [Back to README](/README.md#home-assistant-configuration)
 ## Objectives
 ### **Combine the status of device trackers**
@@ -65,22 +68,19 @@ Note that the person sensor state is triggered by state changes such as a device
 
 #### **Person sensor example (output)**
 
-| Entity            | State | Attribute Name | Value         |
-| :---------------- | :---: | :------------- | :------------ |
-| sensor.rod_status | Home	| source_type:   | gps | 
-|                   |		| battery_level: | 97 |
-|                   |       | latitude:      | xx.136566162109375 | 
-| | | longitude: | -xxx.60774422200406 |
-| | | gps_accuracy: | 65 |
-| | | altitude: | xxxx.1041374206543 |
-| | | vertical_accuracy: | 10 |
-| | | friendly_name: | Rod (Rod's iPhone) is Home |
-| | | account_name: | rod |
-| | | entity_id: | device_tracker.crab_apple |
-| | | reported_state: | Home |
-| | | person_name: | Rod |
-| | | update_time: | 2020-12-11 17:08:52.267362 |
-| | | icon: | mdi:home |
+| Entity            | State | Attribute Name | Value         | Description |
+| :---------------- | :---: | :------------- | :------------ | :---------- |
+| sensor.rod_status | Home	| source_type:   | gps | `source_type` copied from device tracker |
+|                   |       | latitude:      | xx.136566162109375 | `latitude` copied from device tracker |
+| | | longitude: | -xxx.60774422200406 | `longitude` copied from device tracker |
+| | | gps_accuracy: | 65 | `gps_accuracy` copied from device tracker |
+| | | altitude: | xxxx.1041374206543 | `altitude` copied from device tracker |
+| | | vertical_accuracy: | 10 | `vertical_accuracy` copied from device tracker |
+| | | friendly_name: | Rod (Rod's iPhone) is Home | formatted location to be displayed for sensor |
+| | | entity_id: | device_tracker.crab_apple | device tracker that triggered the state |
+| | | reported_state: | Home | `state` reported by the device tracker |
+| | | update_time: | 2020-12-11 17:08:52.267362 | time that the device tracker was updated |
+| | | icon: | mdi:home | icon for the zone for the location |
 
 
 ### **Folder custom_components/person_sensor_update**
@@ -88,14 +88,16 @@ For meaningful results, the device trackers will need to include `latitude` and 
 
 By default, the custom integration will add the following attribute names to the sensor.
 
-| Attribute Name            | Value |
-| :------------------------ | :---- |
-| source_type: | gps          | 
-| meters_from_home: | 71862.3 | 
-| miles_from_home: | 44.7     |
-| direction: | stationary     | 
-| driving_miles: | 50.6       | 
-| driving_minutes: | 46.8     | 
+| Attribute Name            | Value | Description |
+| :------------------------ | :---- | :---------- |
+| meters_from_home: | 71862.3 | calculated distance from Home (meters) |
+| miles_from_home: | 44.7     | calculated distance from Home (miles) |
+| direction: | stationary     | direction from Home |
+| driving_miles: | 50.6       | distance from Home based on Waze route |
+| driving_minutes: | 46.8     | distance from Home based on Waze traffic conditions |
+| previous_latitude: | xx.136533521243905 | saved for next calculations |
+| previous_longitude: | -xxx.60796996859035 | saved for next calculations |
+| previous_update_time: | 2021-01-31 21:14:28.071609 | saved for next calculations |
 
 If the custom integration is not installed, script `person_sensor_update.py` will gracefully go on without it. 
 
@@ -104,9 +106,10 @@ If the custom integration is not installed, script `person_sensor_update.py` wil
 #### **Open Street Map Geocoding**
 The Open Street Map Geocoding feature adds the following attribute names to the sensor.
 
-| Attribute Name            | Value |
-| :------------------------ | :---- |
-| OSM_location: | 1313 Mockingbird Lane Hollywood Los Angeles California 90038 United States | 
+| Attribute Name            | Value | Description |
+| :------------------------ | :---- | :---------- |
+| OSM_location: | 1313 Mockingbird Lane Hollywood Los Angeles California 90038 United States | `display_name` from Open Street Map |
+| friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
 
 Open Street Map (Nominatim) has [a usage policy](https://operations.osmfoundation.org/policies/nominatim/) that limits the frequency of calls. The custom integration attempts to limit calls to less than once per second, possibly skipping an update until the next one comes along.  To meet the requirement to be able to switch off the service, the state of `person_sensor_update.person_sensor_update_api` can be changed to `Off`. This can be done by calling service `person_sensor_update.geocode_api_off` and then resumed later by calling service `person_sensor_update.geocode_api_on`.  The number of calls is also reduced by skipping updates while the person sensor state is `Home` or if the location has changed by less than 10 meters.  (It will update while the state is `Just Arrived`, so it will reflect the home location while home.)
 
@@ -126,9 +129,10 @@ person_sensor_update:
 #### **Google Maps Geocoding**
 The Google Maps Geocoding feature adds the following attribute names to the sensor.
 
-| Attribute Name            | Value |
-| :------------------------ | :---- |
-| google_location: | 1313 Mockingbird Ln,Los Angeles, CA 90038, USA |
+| Attribute Name            | Value | Description |
+| :------------------------ | :---- | :---------- |
+| google_location: | 1313 Mockingbird Ln, Los Angeles, CA 90038, USA | `formatted_address` from Google Maps |
+| friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
 
 *Attribution:* ![powered by Google](images/powered_by_google_on_non_white.png)
 
@@ -140,5 +144,30 @@ To activate the custom integration with the Google Maps Geocoding feature, add a
 person_sensor_update:
     google_api_key: !secret google_api_key
 ```
+## Installation
+### **Manual Installation Hints**
+1. Create `<config>/python_scripts` folder if you haven't already.
+
+2. Add `python_script:` to `<config>/configuration.yaml` if you haven't already.
+
+3. Copy the components into the appropriate folder under `<config>`.
+
+4. Update file `<config>/automation_folder/presence-detection.yaml` as appropriate for your devices.  This file may need to be placed elsewhere or merged into `<config>automation.yaml`, depending on how your configuration is organized. My configuration is split into [multiple folders](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
+
+5. Restart Home Assistant.
+
+6. Add configuration in `<config>/configuration.yaml`.
+
+7. Restart Home Assistant.
+
+### **Configuration Parameters**
+
+
+| Parameter | Optional | Description |
+| :-------- | :------: | :---------- |
+| `google_api_key` | Yes | Google API Key obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). Default: do not do the Google reverse geocoding.
+| `language`       | Yes | Language parameter for the Google API. Default: `en`
+| `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. Default: do not do the OSM reverse geocoding.
+| `region`         | Yes | Region parameter for the Google API. Default: `US`
 
 ### [Back to README](/README.md#home-assistant-configuration)

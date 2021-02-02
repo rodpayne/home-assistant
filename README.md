@@ -19,7 +19,7 @@ This custom integration will look at all device trackers for a particular person
 
 Optionally, when the person sensor changes it can be reverse geocoded using Open Street Maps and the distance from home (miles and minutes) calculated with `WazeRouteCalculator`.
 
-When a person is detected as moving between `Home` and `Away`, instead of going straight to `Home` or `Away`, this will temporarily change the person's status to `Just Arrived` or `Just Left` so that automations can be triggered appropriately.
+When a person is detected as moving between `Home` and `Away`, instead of going straight to `Home` or `Away`, this will temporarily set the person's status to `Just Arrived` or `Just Left` so that automations can be triggered appropriately.
 
 ![Person State Diagram](docs/images/PersonHomeState.png)
 
