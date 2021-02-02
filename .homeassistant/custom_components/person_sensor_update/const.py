@@ -6,7 +6,7 @@ import homeassistant.helpers.config_validation as cv
 DOMAIN ='person_sensor_update'
 INTEGRATION_NAME = 'Person Sensor Update'
 ISSUE_URL = 'https://github.com/rodpayne/home-assistant/issues'
-VERSION = '2021.02.01'
+VERSION = '2021.02.02'
 
 # Constants
 API_STATE_OBJECT = DOMAIN + '.' + DOMAIN + '_api'

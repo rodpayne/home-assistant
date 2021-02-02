@@ -71,7 +71,8 @@ def setup(hass, config):
         entity_id = call.data.get(CONF_ENTITY_ID, 'NONE')
         template = call.data.get(CONF_FRIENDLY_NAME_TEMPLATE, 'NONE')
                                 
-        _LOGGER.debug("(" + entity_id + ") Start " + DOMAIN + ".reverse_geocode")
+        _LOGGER.debug('(' + entity_id + ') Start ' + DOMAIN + '.reverse_geocode')
+        _LOGGER.debug('(' + entity_id + ') ' + CONF_FRIENDLY_NAME_TEMPLATE + ' = ' + template)
 
         """Get component attributes from the API_STATE_OBJECT."""
         apiStateObject = hass.states.get(API_STATE_OBJECT)
@@ -157,9 +158,9 @@ def setup(hass, config):
                             distance_traveled = 0
                         
                         if new_latitude == 'None' or new_longitude == 'None':
-                            _LOGGER.info("(" + entity_id + ") Skipping geocoding because coordinates are missing")
+                            _LOGGER.debug("(" + entity_id + ") Skipping geocoding because coordinates are missing")
                         elif distance_traveled < 10 and old_latitude != 'None' and old_longitude != 'None':
-                            _LOGGER.info("(" + entity_id + ") Skipping geocoding because distance_traveled < 10")
+                            _LOGGER.debug("(" + entity_id + ") Skipping geocoding because distance_traveled < 10")
                         else:
 
                             if 'update_time' in targetAttributesObject:
@@ -239,13 +240,13 @@ def setup(hass, config):
                                     locality = osm_decoded['address']['country']
                                 else:
                                     locality = '?'
-                                _LOGGER.info("(" + entity_id + ") locality = " + locality)
+                                _LOGGER.debug("(" + entity_id + ") locality = " + locality)
                             
                                 if 'display_name' in osm_decoded:
                                     display_name = osm_decoded['display_name']
                                 else: 
                                     display_name = locality
-                                _LOGGER.info("(" + entity_id + ") display_name = " + display_name)
+                                _LOGGER.debug("(" + entity_id + ") display_name = " + display_name)
 
                                 targetAttributesObject['friendly_name'] = template.replace('<locality>',locality)
                                 targetAttributesObject['OSM_location'] = display_name.replace(', ',' ')
@@ -284,13 +285,13 @@ def setup(hass, config):
                                             _LOGGER.debug( '(' + entity_id + ') location_type = ' + location_type + '; formatted_address = ' + formatted_address)
                                         if 'formatted_address' in google_decoded['results'][0]:
                                             formatted_address = google_decoded['results'][0]['formatted_address']
-                                            _LOGGER.info( "(" + entity_id + ") formatted_address = " + formatted_address)
+                                            _LOGGER.debug( "(" + entity_id + ") formatted_address = " + formatted_address)
                                             targetAttributesObject['google_location'] = formatted_address
                                         for component in google_decoded['results'][0]['address_components']:
                                             _LOGGER.debug( '(' + entity_id + ') address_components ' + str(component['types']) + " = " + component["long_name"])
                                             if 'locality' in component['types']:
                                                 locality = component['long_name']
-                                                _LOGGER.info('(' + entity_id + ') locality = ' + locality)
+                                                _LOGGER.debug('(' + entity_id + ') locality = ' + locality)
                                                 targetAttributesObject['friendly_name'] = template.replace('<locality>',locality)
                                         attribution += '"powered by Google"; '
 
@@ -351,7 +352,7 @@ def setup(hass, config):
         apiStateObject = hass.states.get(API_STATE_OBJECT)
         if apiStateObject != None:
             apiAttributesObject = apiStateObject.attributes.copy()
-            _LOGGER.info("Setting " + API_STATE_OBJECT + " on")
+            _LOGGER.debug("Setting " + API_STATE_OBJECT + " on")
             hass.states.set(API_STATE_OBJECT, 'on', apiAttributesObject)
         _LOGGER.debug("Finish " + DOMAIN + ".geocode_api_on")
 
@@ -361,7 +362,7 @@ def setup(hass, config):
         apiStateObject = hass.states.get(API_STATE_OBJECT)
         if apiStateObject != None:
             apiAttributesObject = apiStateObject.attributes.copy()
-            _LOGGER.info("Setting " + API_STATE_OBJECT + " off")
+            _LOGGER.debug("Setting " + API_STATE_OBJECT + " off")
             hass.states.set(API_STATE_OBJECT, 'off', apiAttributesObject)
         _LOGGER.debug("Finish " + DOMAIN + ".geocode_api_off")
 

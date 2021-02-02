@@ -69,7 +69,7 @@ if (triggeredEntity.find('sensor.') == 0) and (triggeredEntity.find('_status') >
   
   newStatus = data.get('state_change')
 
-  logger.info("setting sensor name = {0}; old state = {3}; new state = {1}; from entity_id = {2}".format(sensorName,newStatus,triggeredEntity,oldStatus))
+  logger.debug("setting sensor name = {0}; old state = {3}; new state = {1}; from entity_id = {2}".format(sensorName,newStatus,triggeredEntity,oldStatus))
   
   rest_command = 'homeseer_' + personName.lower() + '_' + newStatus.lower().replace(" ", "_")
   try:
@@ -243,7 +243,7 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
         except:
           logger.debug("rest_command homeseer_{0}_away not defined".format(personName.lower()))
     
-    logger.info("setting sensor name = {0}; oldStatus = {1}; newStatus = {2}".format(sensorName,oldStatus,newStatus))
+    logger.debug("setting sensor name = {0}; oldStatus = {1}; newStatus = {2}".format(sensorName,oldStatus,newStatus))
 
     hass.states.set(sensorName, newStatus, newAttributesObject)
     logger.debug(newAttributesObject)
