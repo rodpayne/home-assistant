@@ -41,6 +41,7 @@ from .const import (
     DEFAULT_LANGUAGE,
     DEFAULT_REGION,
     DOMAIN,
+    INTEGRATION_NAME,
     ISSUE_URL,
     METERS_PER_KM,
     METERS_PER_MILE,
@@ -70,7 +71,8 @@ def setup(hass, config):
         entity_id = call.data.get(CONF_ENTITY_ID, 'NONE')
         template = call.data.get(CONF_FRIENDLY_NAME_TEMPLATE, 'NONE')
                                 
-        _LOGGER.debug("(" + entity_id + ") Start " + DOMAIN + ".reverse_geocode")
+        _LOGGER.debug('(' + entity_id + ') Start ' + DOMAIN + '.reverse_geocode')
+        _LOGGER.debug('(' + entity_id + ') ' + CONF_FRIENDLY_NAME_TEMPLATE + ' = ' + template)
 
         """Get component attributes from the API_STATE_OBJECT."""
         apiStateObject = hass.states.get(API_STATE_OBJECT)
@@ -106,16 +108,20 @@ def setup(hass, config):
                         _LOGGER.debug("(" + entity_id + ") wait_time = " + str(wait_time))
                         time.sleep(wait_time)
                         currentApiTime = datetime.now()
+                
+                    """Record the component attributes in the API_STATE_OBJECT."""
+            
                     apiAttributesObject['last_api_time'] = currentApiTime
             
-                    """Record the component attributes in the API_STATE_OBJECT."""
-                    apiAttributesObject['last_entity_id'] = entity_id
-                    _LOGGER.debug("(" + entity_id + ") entity_id = " + entity_id)
-                        
-                    apiAttributesObject['last_template'] = template
-                    _LOGGER.debug("(" + entity_id + ") template = " + template)
-
                     apiAttributesObject['attempted_api_calls'] = attemptedApiCalls + 1
+
+                    counter_attribute = f"{entity_id} calls"
+                    if counter_attribute in apiAttributesObject:
+                        new_count = apiAttributesObject[counter_attribute] + 1
+                    else:
+                        new_count = 1
+                    apiAttributesObject[counter_attribute] = new_count
+                    _LOGGER.debug("(" + entity_id + ") " + counter_attribute + " = " + str(new_count))
 
                     _LOGGER.debug("(" + entity_id + ") Setting " + API_STATE_OBJECT)
                     hass.states.set(API_STATE_OBJECT, apiStatus, apiAttributesObject)
@@ -152,9 +158,9 @@ def setup(hass, config):
                             distance_traveled = 0
                         
                         if new_latitude == 'None' or new_longitude == 'None':
-                            _LOGGER.info("(" + entity_id + ") Skipping geocoding because coordinates are missing")
+                            _LOGGER.debug("(" + entity_id + ") Skipping geocoding because coordinates are missing")
                         elif distance_traveled < 10 and old_latitude != 'None' and old_longitude != 'None':
-                            _LOGGER.info("(" + entity_id + ") Skipping geocoding because distance_traveled < 10")
+                            _LOGGER.debug("(" + entity_id + ") Skipping geocoding because distance_traveled < 10")
                         else:
 
                             if 'update_time' in targetAttributesObject:
@@ -234,13 +240,13 @@ def setup(hass, config):
                                     locality = osm_decoded['address']['country']
                                 else:
                                     locality = '?'
-                                _LOGGER.info("(" + entity_id + ") locality = " + locality)
+                                _LOGGER.debug("(" + entity_id + ") locality = " + locality)
                             
                                 if 'display_name' in osm_decoded:
                                     display_name = osm_decoded['display_name']
                                 else: 
                                     display_name = locality
-                                _LOGGER.info("(" + entity_id + ") display_name = " + display_name)
+                                _LOGGER.debug("(" + entity_id + ") display_name = " + display_name)
 
                                 targetAttributesObject['friendly_name'] = template.replace('<locality>',locality)
                                 targetAttributesObject['OSM_location'] = display_name.replace(', ',' ')
@@ -279,13 +285,13 @@ def setup(hass, config):
                                             _LOGGER.debug( '(' + entity_id + ') location_type = ' + location_type + '; formatted_address = ' + formatted_address)
                                         if 'formatted_address' in google_decoded['results'][0]:
                                             formatted_address = google_decoded['results'][0]['formatted_address']
-                                            _LOGGER.info( "(" + entity_id + ") formatted_address = " + formatted_address)
+                                            _LOGGER.debug( "(" + entity_id + ") formatted_address = " + formatted_address)
                                             targetAttributesObject['google_location'] = formatted_address
                                         for component in google_decoded['results'][0]['address_components']:
                                             _LOGGER.debug( '(' + entity_id + ') address_components ' + str(component['types']) + " = " + component["long_name"])
                                             if 'locality' in component['types']:
                                                 locality = component['long_name']
-                                                _LOGGER.info('(' + entity_id + ') locality = ' + locality)
+                                                _LOGGER.debug('(' + entity_id + ') locality = ' + locality)
                                                 targetAttributesObject['friendly_name'] = template.replace('<locality>',locality)
                                         attribution += '"powered by Google"; '
 
@@ -322,11 +328,8 @@ def setup(hass, config):
                                 except Exception as e:
                                     _LOGGER.error("(" + entity_id + ") Waze Exception - " + str(e))
                                     _LOGGER.debug(traceback.format_exc())
-                                    if 'api_error_count' in apiAttributesObject:
-                                        wazeErrorCount = apiAttributesObject['waze_error_count']
-                                    else:
-                                        wazeErrorCount = 0
-                                    apiAttributesObject['waze_error_count'] = wazeErrorCount + 1
+                                    wazeErrorCount = apiAttributesObject['waze_error_count'] + 1
+                                    apiAttributesObject['waze_error_count'] = wazeErrorCount
                                     hass.states.set(API_STATE_OBJECT, apiStatus, apiAttributesObject)
                                     targetAttributesObject.pop('driving_miles')
                                     targetAttributesObject.pop('driving_minutes')
@@ -338,11 +341,8 @@ def setup(hass, config):
             except Exception as e:
                 _LOGGER.error("(" + entity_id + ") Exception - " + str(e))
                 _LOGGER.debug(traceback.format_exc())
-                if 'api_error_count' in apiAttributesObject:
-                    apiErrorCount = apiAttributesObject['api_error_count']
-                else:
-                    apiErrorCount = 0
-                apiAttributesObject['api_error_count'] = apiErrorCount + 1
+                apiErrorCount = apiAttributesObject['api_error_count'] + 1
+                apiAttributesObject['api_error_count'] = apiErrorCount
                 hass.states.set(API_STATE_OBJECT, apiStatus, apiAttributesObject)
         _LOGGER.debug("(" + entity_id + ") Finish " + DOMAIN + ".reverse_geocode")
 
@@ -352,7 +352,7 @@ def setup(hass, config):
         apiStateObject = hass.states.get(API_STATE_OBJECT)
         if apiStateObject != None:
             apiAttributesObject = apiStateObject.attributes.copy()
-            _LOGGER.info("Setting " + API_STATE_OBJECT + " on")
+            _LOGGER.debug("Setting " + API_STATE_OBJECT + " on")
             hass.states.set(API_STATE_OBJECT, 'on', apiAttributesObject)
         _LOGGER.debug("Finish " + DOMAIN + ".geocode_api_on")
 
@@ -362,7 +362,7 @@ def setup(hass, config):
         apiStateObject = hass.states.get(API_STATE_OBJECT)
         if apiStateObject != None:
             apiAttributesObject = apiStateObject.attributes.copy()
-            _LOGGER.info("Setting " + API_STATE_OBJECT + " off")
+            _LOGGER.debug("Setting " + API_STATE_OBJECT + " off")
             hass.states.set(API_STATE_OBJECT, 'off', apiAttributesObject)
         _LOGGER.debug("Finish " + DOMAIN + ".geocode_api_off")
 
@@ -380,6 +380,11 @@ def setup(hass, config):
     apiAttributesObject['friendly_name'] = 'Person Sensor Update API'
     apiAttributesObject['home_latitude'] = home_latitude
     apiAttributesObject['home_longitude'] = home_longitude
+    apiAttributesObject['last_api_time'] = datetime.now()       
+    apiAttributesObject['attempted_api_calls'] = 0
+    apiAttributesObject['api_error_count'] = 0
+    apiAttributesObject['waze_error_count'] = 0
+    apiAttributesObject[ATTR_ATTRIBUTION] = f"System information for the {INTEGRATION_NAME} integration ({DOMAIN}), version {VERSION}."
     hass.states.set(API_STATE_OBJECT, 'on', apiAttributesObject)
 
     # Return boolean to indicate that setup was successful.

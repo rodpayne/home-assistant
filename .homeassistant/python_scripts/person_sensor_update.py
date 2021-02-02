@@ -69,7 +69,7 @@ if (triggeredEntity.find('sensor.') == 0) and (triggeredEntity.find('_status') >
   
   newStatus = data.get('state_change')
 
-  logger.info("setting sensor name = {0}; old state = {3}; new state = {1}; from entity_id = {2}".format(sensorName,newStatus,triggeredEntity,oldStatus))
+  logger.debug("setting sensor name = {0}; old state = {3}; new state = {1}; from entity_id = {2}".format(sensorName,newStatus,triggeredEntity,oldStatus))
   
   rest_command = 'homeseer_' + personName.lower() + '_' + newStatus.lower().replace(" ", "_")
   try:
@@ -243,7 +243,7 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
         except:
           logger.debug("rest_command homeseer_{0}_away not defined".format(personName.lower()))
     
-    logger.info("setting sensor name = {0}; oldStatus = {1}; newStatus = {2}".format(sensorName,oldStatus,newStatus))
+    logger.debug("setting sensor name = {0}; oldStatus = {1}; newStatus = {2}".format(sensorName,oldStatus,newStatus))
 
     hass.states.set(sensorName, newStatus, newAttributesObject)
     logger.debug(newAttributesObject)
@@ -255,7 +255,7 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
 # - calculate other location-based statistics, such as distance_from_home
 # For devices at Home, this will only be done initially or on arrival (newStatus = 'Just Arrived')
 #--------------------------------------------------------------------------------------------------
-    if newStatus != 'Home' or ha_just_started == 'on':
+    if triggeredStatusHomeAway == 'Away' or ha_just_started == 'on':
       try:
         service_data = {"entity_id": sensorName, "friendly_name_template": template}
         hass.services.call("person_sensor_update", "reverse_geocode", service_data, True)

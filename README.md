@@ -14,12 +14,12 @@ Excellent documentation and HACS installation available from (https://github.com
 
 4. Restart Home Assistant.
 
-## **Person Sensor**
-This custom integration will look at all device trackers for a particular person and combine them into a single person sensor, `sensor.<name>_status`. Device tracker state changes are monitored rather than averaging the states or calculating a probability.
+## **Person Status Sensor**
+This custom integration will look at all device trackers for a particular person and combine them into a single person sensor, `sensor.<name>_status`. Device tracker state change events are monitored rather than polling, making a composite, averaging the states, or calculating a probability.
 
-Optionally, when the person sensor changes it can be reverse geocoded using Open Street Maps and the distance from home (miles and minutes) calculated with `WazeRouteCalculator`.
+Optionally, when the person sensor changes it can be reverse geocoded using Open Street Maps or Google Maps and the distance from home (miles and minutes) calculated with `WazeRouteCalculator`.
 
-When a person is detected as moving between `Home` and `Away`, instead of going straight to `Home` or `Away`, this will temporarily change the person's status to `Just Arrived` or `Just Left` so that automations can be triggered appropriately.
+When a person is detected as moving between `Home` and `Away`, instead of going straight to `Home` or `Away`, this will temporarily set the person's status to `Just Arrived` or `Just Left` so that automations can be triggered appropriately.
 
 ![Person State Diagram](docs/images/PersonHomeState.png)
 
