@@ -41,6 +41,7 @@ from .const import (
     DEFAULT_LANGUAGE,
     DEFAULT_REGION,
     DOMAIN,
+    INTEGRATION_NAME,
     ISSUE_URL,
     METERS_PER_KM,
     METERS_PER_MILE,
@@ -106,16 +107,20 @@ def setup(hass, config):
                         _LOGGER.debug("(" + entity_id + ") wait_time = " + str(wait_time))
                         time.sleep(wait_time)
                         currentApiTime = datetime.now()
+                
+                    """Record the component attributes in the API_STATE_OBJECT."""
+            
                     apiAttributesObject['last_api_time'] = currentApiTime
             
-                    """Record the component attributes in the API_STATE_OBJECT."""
-                    apiAttributesObject['last_entity_id'] = entity_id
-                    _LOGGER.debug("(" + entity_id + ") entity_id = " + entity_id)
-                        
-                    apiAttributesObject['last_template'] = template
-                    _LOGGER.debug("(" + entity_id + ") template = " + template)
-
                     apiAttributesObject['attempted_api_calls'] = attemptedApiCalls + 1
+
+                    counter_attribute = f"{entity_id} calls"
+                    if counter_attribute in apiAttributesObject:
+                        new_count = apiAttributesObject[counter_attribute] + 1
+                    else:
+                        new_count = 1
+                    apiAttributesObject[counter_attribute] = new_count
+                    _LOGGER.debug("(" + entity_id + ") " + counter_attribute + " = " + str(new_count))
 
                     _LOGGER.debug("(" + entity_id + ") Setting " + API_STATE_OBJECT)
                     hass.states.set(API_STATE_OBJECT, apiStatus, apiAttributesObject)
@@ -322,11 +327,8 @@ def setup(hass, config):
                                 except Exception as e:
                                     _LOGGER.error("(" + entity_id + ") Waze Exception - " + str(e))
                                     _LOGGER.debug(traceback.format_exc())
-                                    if 'api_error_count' in apiAttributesObject:
-                                        wazeErrorCount = apiAttributesObject['waze_error_count']
-                                    else:
-                                        wazeErrorCount = 0
-                                    apiAttributesObject['waze_error_count'] = wazeErrorCount + 1
+                                    wazeErrorCount = apiAttributesObject['waze_error_count'] + 1
+                                    apiAttributesObject['waze_error_count'] = wazeErrorCount
                                     hass.states.set(API_STATE_OBJECT, apiStatus, apiAttributesObject)
                                     targetAttributesObject.pop('driving_miles')
                                     targetAttributesObject.pop('driving_minutes')
@@ -338,11 +340,8 @@ def setup(hass, config):
             except Exception as e:
                 _LOGGER.error("(" + entity_id + ") Exception - " + str(e))
                 _LOGGER.debug(traceback.format_exc())
-                if 'api_error_count' in apiAttributesObject:
-                    apiErrorCount = apiAttributesObject['api_error_count']
-                else:
-                    apiErrorCount = 0
-                apiAttributesObject['api_error_count'] = apiErrorCount + 1
+                apiErrorCount = apiAttributesObject['api_error_count'] + 1
+                apiAttributesObject['api_error_count'] = apiErrorCount
                 hass.states.set(API_STATE_OBJECT, apiStatus, apiAttributesObject)
         _LOGGER.debug("(" + entity_id + ") Finish " + DOMAIN + ".reverse_geocode")
 
@@ -380,6 +379,11 @@ def setup(hass, config):
     apiAttributesObject['friendly_name'] = 'Person Sensor Update API'
     apiAttributesObject['home_latitude'] = home_latitude
     apiAttributesObject['home_longitude'] = home_longitude
+    apiAttributesObject['last_api_time'] = datetime.now()       
+    apiAttributesObject['attempted_api_calls'] = 0
+    apiAttributesObject['api_error_count'] = 0
+    apiAttributesObject['waze_error_count'] = 0
+    apiAttributesObject[ATTR_ATTRIBUTION] = f"System information for the {INTEGRATION_NAME} integration ({DOMAIN}), version {VERSION}."
     hass.states.set(API_STATE_OBJECT, 'on', apiAttributesObject)
 
     # Return boolean to indicate that setup was successful.

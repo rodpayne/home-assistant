@@ -255,7 +255,7 @@ elif (triggeredEntity.find('device_tracker.') == 0) or (triggeredEntity.find('bi
 # - calculate other location-based statistics, such as distance_from_home
 # For devices at Home, this will only be done initially or on arrival (newStatus = 'Just Arrived')
 #--------------------------------------------------------------------------------------------------
-    if newStatus != 'Home' or ha_just_started == 'on':
+    if triggeredStatusHomeAway == 'Away' or ha_just_started == 'on':
       try:
         service_data = {"entity_id": sensorName, "friendly_name_template": template}
         hass.services.call("person_sensor_update", "reverse_geocode", service_data, True)
