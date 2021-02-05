@@ -7,9 +7,9 @@
   * [Make presence detection not so binary](#make-presence-detection-not-so-binary)
   * [Reverse geocode the location and make calculations](#reverse-geocode-the-location-and-make-calculations)
 * [Components](#components)
-  * [File automation_folder/presence-detection.yaml](#file-automation_folderpresence-detectionyaml)
+  * [File automation_folder/person_location_detection](#file-automation_folderperson_location_detectionyaml)
     * [Device tracker requirements (input)](#device-tracker-requirements-input)
-  * [File python_scripts/person_sensor_update.py](#file-python_scriptsperson_sensor_updatepy)
+  * [File python_scripts/person_location_update.py](#file-python_scriptsperson_location_updatepy)
     * [Person sensor example (output)](#person-sensor-example-output)
   * [Folder custom_components/person_location](#folder-custom_componentsperson_location)
     * [Open Street Map Geocoding](#open-street-map-geocoding)
@@ -24,7 +24,7 @@
 ## Objectives
 ![Sample person location](images/SamplePersonLocation.png)
 
-### **Combine the status of device trackers**
+### **Combine the status of multiple device trackers**
 This custom integration will look at all device trackers for a particular person and combine them into a single person location sensor, `sensor.<name>_location`. Device tracker state changes are monitored rather than doing polling, averaging the states, or calculating a probability. 
 Device trackers follow a device that the person has; the person location sensor tries to follow the person instead.
 

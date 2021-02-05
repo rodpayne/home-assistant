@@ -33,7 +33,7 @@
       - sensor.tom_location
     to: 'Just Left'
     for:
-      minutes: 5
+      minutes: 3
   action:
   - service: python_script.person_location_update
     data_template:
