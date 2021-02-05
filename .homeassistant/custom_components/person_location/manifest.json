@@ -1,0 +1,13 @@
+{
+  "domain": "person_location",
+  "name": "Person Location",
+  "documentation": "https://github.com/rodpayne/home-assistant",
+  "dependencies": ["sensor","zone"],
+  "codeowners": ["@rodpayne"],
+  "requirements": [
+    "datetime",
+    "integrationhelper",
+    "voluptuous"
+  ],
+  "version": "2021.02.04"
+}

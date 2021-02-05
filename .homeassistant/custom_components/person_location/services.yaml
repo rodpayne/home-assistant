@@ -1,0 +1,24 @@
+
+reverse_geocode:
+  # Description of the service
+  description: Call API to reverse geocode the location in a person status sensor.
+  # Different fields that your service accepts
+  fields:
+    # Key of the field
+    entity_id:
+      # Description of the field
+      description: Name of the entitity to examine
+      # Example value that can be passed for this field
+      example: "sensor.rod_location"
+    friendly_name_template:
+      description: Template for the friendly_name
+      example: "Rod (Rod's iPhone) is in <locality>"
+      
+geocode_api_on:
+  # Description of the service
+  description: Resume using the Open Street Map API and WazeRouteCalculator.
+
+geocode_api_off:
+  # Description of the service
+  description: Pause using the Open Street Map API. This may be necessary if a malfunction causes an excessive number of calls or if the external site is unreachable. The Nominatim Usage Policy says, "Apps must make sure that they can switch off the service at our request at any time (in particular, switching should be possible without requiring a software update)." This also pauses the WazeRouteCalculator calls.
+ 
