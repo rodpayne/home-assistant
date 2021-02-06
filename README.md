@@ -25,4 +25,4 @@ When a person is detected as moving between `Home` and `Away`, instead of going 
 
 *Inspired by <https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/>* 
 
-### [Go to Person Detection Details](docs/PersonDetection.md#table-of-contents)
+### [Go to Person Detection Details](docs/PersonDetection_person_location.md#table-of-contents)

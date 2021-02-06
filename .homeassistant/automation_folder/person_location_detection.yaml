@@ -1,0 +1,142 @@
+#----------------------------------------------------------------------------------------------------------
+# Set up something like https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/  
+#----------------------------------------------------------------------------------------------------------
+
+- alias: Mark person location as Home
+  initial_state: 'on'
+  mode: queued
+  max: 10
+  trigger:
+  - platform: state
+    entity_id:
+      - sensor.rod_location
+      - sensor.pam_location
+      - sensor.tom_location
+    to: 'Just Arrived'
+    for:
+      minutes: 3
+  action:
+  - service: python_script.person_location_update
+    data_template:
+      entity_id: '{{trigger.entity_id}}'
+      state_change: 'Home'
+
+- alias: Mark person location as Away
+  initial_state: 'on'
+  mode: queued
+  max: 10
+  trigger:
+  - platform: state
+    entity_id:
+      - sensor.rod_location
+      - sensor.pam_location
+      - sensor.tom_location
+    to: 'Just Left'
+    for:
+      minutes: 3
+  action:
+  - service: python_script.person_location_update
+    data_template:
+      entity_id: '{{trigger.entity_id}}'
+      state_change: 'Away'
+
+- alias: Mark person location as Extended Away
+  initial_state: 'on'
+  mode: queued
+  max: 10
+  trigger:
+  - platform: state
+    entity_id:
+      - sensor.rod_location
+      - sensor.pam_location
+      - sensor.tom_location
+    to: 'Away'
+    for:
+      hours: 48
+  action:
+  - service: python_script.person_location_update
+    data_template:
+      entity_id: '{{trigger.entity_id}}'
+      state_change: 'Extended Away'
+
+#----------------------------------------------------------------------------------------------------------
+# Determine presence from device tracker indicators
+#----------------------------------------------------------------------------------------------------------
+
+- alias: Person Location Update
+  initial_state: 'on'
+  mode: queued
+  max: 10
+  trigger:
+  - platform: state
+    entity_id: 
+#      - device_tracker.rod_iphone
+#      - device_tracker.rod_iphone_2
+#      - device_tracker.rod_iphone_app
+#      - device_tracker.rod_ipad
+#      - device_tracker.rod_ipad_2
+#      - device_tracker.rod_ipad_app
+      - sensor.ford_focus_location
+#      - device_tracker.rod_wristwatch
+#      - device_tracker.pams_iphone_app
+#      - device_tracker.pams_iphone
+#      - device_tracker.toms_iphone
+  action:
+  - service: python_script.person_location_update
+    data_template:
+      entity_id: '{{trigger.entity_id}}'
+      from_state: '{{trigger.from_state.state}}'
+      to_state: '{{trigger.to_state.state}}'
+
+# New way to do it without listing every entity that mobile app creates:
+- alias: Person Location Device Tracker Updated
+  initial_state: 'on'
+  mode: queued
+  max: 10
+  trigger:
+    - platform: event
+      event_type: state_changed
+  condition:
+    - condition: template
+      value_template: >
+        {{ trigger.event.data.entity_id.startswith('device_tracker.')
+           and trigger.event.data.new_state.state != 'NotSet' }}      
+  action:
+    - service: python_script.person_location_update
+      data_template:
+        entity_id: '{{trigger.event.data.entity_id}}'
+        from_state: '{{trigger.event.data.old_state.state}}'
+        to_state: '{{trigger.event.data.new_state.state}}'
+        
+#- alias: Person Sensor Update for router home
+#  initial_state: 'on'
+#  mode: queued
+#  max: 10
+#  trigger:
+#  - platform: state
+#    entity_id: device_tracker.iphoneyallphone
+#    to: 'home'
+#  action:
+#  - service: python_script.person_location_update
+#    data_template:
+#      entity_id: '{{trigger.entity_id}}'
+#      from_state: '{{trigger.from_state.state}}'
+#      to_state: '{{trigger.to_state.state}}'
+
+#- alias: Person Sensor Update for router not_home
+#  initial_state: 'on'
+#  mode: queued
+#  max: 10
+#  trigger:
+#  - platform: state
+#    entity_id: device_tracker.iphoneyallphone
+#    to: 'not_home'
+#    for:
+#      seconds: 300
+#  action:
+#  - service: python_script.person_location_update
+#    data_template:
+#      entity_id: '{{trigger.entity_id}}'
+#      from_state: '{{trigger.from_state.state}}'
+#      to_state: '{{trigger.to_state.state}}'
+

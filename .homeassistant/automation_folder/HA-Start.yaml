@@ -23,19 +23,19 @@
 # - create person sensors to pretty things up until the update happens
     - service: python_script.set_state
       data_template:
-        entity_id: 'sensor.rod_status'
+        entity_id: 'sensor.rod_location'
         state: 'Unknown'
         friendly_name: 'Rod (HA restarted)'
         person_name: 'Rod'
         allow_create: True
     - service: python_script.set_state
       data_template:
-        entity_id: 'sensor.pam_status'
+        entity_id: 'sensor.pam_location'
         state: 'Unknown'
         friendly_name: 'Pam (HA restarted)'
         person_name: 'Pam'
         allow_create: True
-# - Update person sensors after device_tracker has been created
+# - Update person sensors after iCloud3 device_tracker has been created
     - delay:
         seconds: 30
     - service: device_tracker.icloud3_update
