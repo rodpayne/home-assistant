@@ -6,7 +6,7 @@ import homeassistant.helpers.config_validation as cv
 DOMAIN ='person_location'
 INTEGRATION_NAME = 'Person Location'
 ISSUE_URL = 'https://github.com/rodpayne/home-assistant/issues'
-VERSION = '2021.02.04'
+VERSION = '2021.02.05'
 
 # Constants
 API_STATE_OBJECT = DOMAIN + '.' + DOMAIN + '_api'
