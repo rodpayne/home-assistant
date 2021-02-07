@@ -15,14 +15,18 @@ For details, refer to the docs in https://github.com/rodpayne/home-assistant.
 """
 import json
 import logging
-import requests
 import threading
 import time
 import traceback
-import voluptuous as vol
-import homeassistant.helpers.config_validation as cv
-from requests import get
+from datetime import datetime, timedelta
 
+import homeassistant.helpers.config_validation as cv
+import requests
+import voluptuous as vol
+from homeassistant.components.device_tracker.const import (
+    ATTR_SOURCE_TYPE,
+    SOURCE_TYPE_GPS,
+)
 from homeassistant.const import (
     ATTR_ATTRIBUTION,
     ATTR_GPS_ACCURACY,
@@ -31,10 +35,9 @@ from homeassistant.const import (
     CONF_ENTITY_ID,
     CONF_FRIENDLY_NAME_TEMPLATE,
 )
-from homeassistant.components.device_tracker.const import (
-    ATTR_SOURCE_TYPE,
-    SOURCE_TYPE_GPS,
-)
+from homeassistant.util.location import distance
+from requests import get
+
 from .const import (
     API_STATE_OBJECT,
     CONF_API_KEY_NOT_SET,
@@ -54,9 +57,6 @@ from .const import (
     THROTTLE_INTERVAL,
     VERSION,
 )
-
-from datetime import datetime, timedelta
-from homeassistant.util.location import distance
 
 _LOGGER = logging.getLogger(__name__)
 

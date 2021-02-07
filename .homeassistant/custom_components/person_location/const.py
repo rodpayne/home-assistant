@@ -1,17 +1,17 @@
 """ Constants """
 import logging
 import threading
-import voluptuous as vol
-from datetime import timedelta
-import homeassistant.helpers.config_validation as cv
-from integrationhelper.const import CC_STARTUP_VERSION
+from datetime import datetime, timedelta
 
+import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
 from homeassistant.const import (
     ATTR_ATTRIBUTION,
     ATTR_FRIENDLY_NAME,
     ATTR_LATITUDE,
     ATTR_LONGITUDE,
 )
+from integrationhelper.const import CC_STARTUP_VERSION
 
 # Our info
 DOMAIN = "person_location"
@@ -52,11 +52,6 @@ CONFIG_SCHEMA = vol.Schema(
         ),
     },
     extra=vol.ALLOW_EXTRA,
-)
-
-from datetime import (
-    datetime,
-    timedelta,
 )
 
 _LOGGER = logging.getLogger(__name__)
