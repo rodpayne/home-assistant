@@ -24,12 +24,12 @@ import homeassistant.helpers.config_validation as cv
 from requests import get
 
 from homeassistant.const import (
-    ATTR_ATTRIBUTION, 
+    ATTR_ATTRIBUTION,
     ATTR_GPS_ACCURACY,
-    ATTR_LATITUDE, 
+    ATTR_LATITUDE,
     ATTR_LONGITUDE,
-    CONF_ENTITY_ID, 
-    CONF_FRIENDLY_NAME_TEMPLATE, 
+    CONF_ENTITY_ID,
+    CONF_FRIENDLY_NAME_TEMPLATE,
 )
 from homeassistant.components.device_tracker.const import (
     ATTR_SOURCE_TYPE,
@@ -64,39 +64,57 @@ _LOGGER = logging.getLogger(__name__)
 def setup(hass, config):
     """Setup is called when Home Assistant is loading our component."""
 
-    pli = PERSON_LOCATION_INTEGRATION(API_STATE_OBJECT,hass,config)
+    pli = PERSON_LOCATION_INTEGRATION(API_STATE_OBJECT, hass, config)
     integration_lock = threading.Lock()
 
     def handle_reverse_geocode(call):
         """ Handle the reverse_geocode service. """
 
-        entity_id = call.data.get(CONF_ENTITY_ID, 'NONE')
-        template = call.data.get(CONF_FRIENDLY_NAME_TEMPLATE, 'NONE')
-                                
-        _LOGGER.debug('(' + entity_id + ') Start ' + DOMAIN + '.reverse_geocode')
-        _LOGGER.debug('(' + entity_id + ') ' + CONF_FRIENDLY_NAME_TEMPLATE + ' = ' + template)
+        entity_id = call.data.get(CONF_ENTITY_ID, "NONE")
+        template = call.data.get(CONF_FRIENDLY_NAME_TEMPLATE, "NONE")
+
+        _LOGGER.debug("(" + entity_id + ") Start " + DOMAIN + ".reverse_geocode")
+        _LOGGER.debug(
+            "(" + entity_id + ") " + CONF_FRIENDLY_NAME_TEMPLATE + " = " + template
+        )
 
         with integration_lock:
             """Lock while updating the pli(API_STATE_OBJECT)."""
             try:
                 currentApiTime = datetime.now()
-                
-                if (pli.state.lower() != 'on'):
-                    pli.attributes['skipped_api_calls'] += 1
-                    _LOGGER.debug("(" + entity_id + ") skipped_api_calls = " + str(pli.attributes['skipped_api_calls']))
+
+                if pli.state.lower() != "on":
+                    """Allow API calls to be paused."""
+                    pli.attributes["skipped_api_calls"] += 1
+                    _LOGGER.debug(
+                        "(%s) skipped_api_calls = %d"
+                        % (entity_id, pli.attributes["skipped_api_calls"])
+                    )
                 else:
-                    """Throttle (or possibly pause) the API calls so that we don't exceed policy."""
-                    wait_time = (pli.attributes['last_api_time'] - currentApiTime + THROTTLE_INTERVAL).total_seconds()
-                    if (wait_time > 0):
-                        _LOGGER.debug("(" + entity_id + ") wait_time = " + str(wait_time))
+                    """Throttle the API calls so that we don't exceed policy."""
+                    wait_time = (
+                        pli.attributes["last_api_time"]
+                        - currentApiTime
+                        + THROTTLE_INTERVAL
+                    ).total_seconds()
+                    if wait_time > 0:
+                        pli.attributes["throttled_api_calls"] += 1
+                        _LOGGER.debug(
+                            "(%s) wait_time = %05.3f; throttled_api_calls = %d"
+                            % (
+                                entity_id,
+                                wait_time,
+                                pli.attributes["throttled_api_calls"],
+                            )
+                        )
                         time.sleep(wait_time)
                         currentApiTime = datetime.now()
-                
-                    """Record the component attributes in the API_STATE_OBJECT."""
-            
-                    pli.attributes['last_api_time'] = currentApiTime
-            
-                    pli.attributes['attempted_api_calls'] += 1
+
+                    """Record the integration attributes in the API_STATE_OBJECT."""
+
+                    pli.attributes["last_api_time"] = currentApiTime
+
+                    pli.attributes["attempted_api_calls"] += 1
 
                     counter_attribute = f"{entity_id} calls"
                     if counter_attribute in pli.attributes:
@@ -104,218 +122,427 @@ def setup(hass, config):
                     else:
                         new_count = 1
                     pli.attributes[counter_attribute] = new_count
-                    _LOGGER.debug("(" + entity_id + ") " + counter_attribute + " = " + str(new_count))
+                    _LOGGER.debug(
+                        "("
+                        + entity_id
+                        + ") "
+                        + counter_attribute
+                        + " = "
+                        + str(new_count)
+                    )
 
-                    """Handle the service call, updating the targetStateObject."""
-                    target = PERSON_LOCATION_ENTITY(entity_id,hass)
-            #        integration_lock = threading.Lock()
+                    """Handle the service call, updating the target(entity_id)."""
+                    target = PERSON_LOCATION_ENTITY(entity_id, hass)
                     with target.lock:
                         """Lock while updating the target(entity_id)."""
-                        attribution = ''
+                        attribution = ""
+
                         if ATTR_LATITUDE in target.attributes:
                             new_latitude = target.attributes[ATTR_LATITUDE]
                         else:
-                            new_latitude = 'None'
+                            new_latitude = "None"
                         if ATTR_LONGITUDE in target.attributes:
                             new_longitude = target.attributes[ATTR_LONGITUDE]
                         else:
-                            new_longitude = 'None'
-                            
-                        if 'location_latitude' in target.attributes:
-                            old_latitude = target.attributes['location_latitude']
+                            new_longitude = "None"
+
+                        if "location_latitude" in target.attributes:
+                            old_latitude = target.attributes["location_latitude"]
                         else:
-                            old_latitude = 'None'
-                        if 'location_longitude' in target.attributes:
-                            old_longitude = target.attributes['location_longitude']
+                            old_latitude = "None"
+                        if "location_longitude" in target.attributes:
+                            old_longitude = target.attributes["location_longitude"]
                         else:
-                            old_longitude = 'None'
-                                
-                        if (new_latitude != 'None' and new_longitude != 'None' and old_latitude != 'None' and old_longitude != 'None'):
-                            distance_traveled = round(distance(float(new_latitude), float(new_longitude), float(old_latitude), float(old_longitude)),3)
-                            _LOGGER.debug("(" + entity_id + ") distance_traveled = " + str(distance_traveled))
+                            old_longitude = "None"
+
+                        if (
+                            new_latitude != "None"
+                            and new_longitude != "None"
+                            and old_latitude != "None"
+                            and old_longitude != "None"
+                        ):
+                            distance_traveled = round(
+                                distance(
+                                    float(new_latitude),
+                                    float(new_longitude),
+                                    float(old_latitude),
+                                    float(old_longitude),
+                                ),
+                                3,
+                            )
+                            _LOGGER.debug(
+                                "("
+                                + entity_id
+                                + ") distance_traveled = "
+                                + str(distance_traveled)
+                            )
                         else:
                             distance_traveled = 0
-                            
-                        if new_latitude == 'None' or new_longitude == 'None':
-                            _LOGGER.debug("(" + entity_id + ") Skipping geocoding because coordinates are missing")
-                        elif distance_traveled < 10 and old_latitude != 'None' and old_longitude != 'None':
-                            _LOGGER.debug("(" + entity_id + ") Skipping geocoding because distance_traveled < 10")
+
+                        if new_latitude == "None" or new_longitude == "None":
+                            _LOGGER.debug(
+                                "("
+                                + entity_id
+                                + ") Skipping geocoding because coordinates are missing"
+                            )
+                        elif (
+                            distance_traveled < 10
+                            and old_latitude != "None"
+                            and old_longitude != "None"
+                        ):
+                            _LOGGER.debug(
+                                "("
+                                + entity_id
+                                + ") Skipping geocoding because distance_traveled < 10"
+                            )
                         else:
 
-                            if 'update_time' in target.attributes:
-                                new_update_time = datetime.strptime(target.attributes['update_time'],'%Y-%m-%d %H:%M:%S.%f')
-                                _LOGGER.debug("(" + entity_id + ") new_update_time = " + str(new_update_time))
+                            if "update_time" in target.attributes:
+                                new_update_time = datetime.strptime(
+                                    target.attributes["update_time"],
+                                    "%Y-%m-%d %H:%M:%S.%f",
+                                )
+                                _LOGGER.debug(
+                                    "("
+                                    + entity_id
+                                    + ") new_update_time = "
+                                    + str(new_update_time)
+                                )
                             else:
                                 new_update_time = currentApiTime
-                                
-                            if 'location_update_time' in target.attributes:
-                                old_update_time = datetime.strptime(target.attributes['location_update_time'],'%Y-%m-%d %H:%M:%S.%f')
-                                _LOGGER.debug("(" + entity_id + ") old_update_time = " + str(old_update_time))
+
+                            if "location_update_time" in target.attributes:
+                                old_update_time = datetime.strptime(
+                                    target.attributes["location_update_time"],
+                                    "%Y-%m-%d %H:%M:%S.%f",
+                                )
+                                _LOGGER.debug(
+                                    "("
+                                    + entity_id
+                                    + ") old_update_time = "
+                                    + str(old_update_time)
+                                )
                             else:
                                 old_update_time = new_update_time
-        
+
                             elapsed_time = new_update_time - old_update_time
-                            _LOGGER.debug("(" + entity_id + ") elapsed_time = " + str(elapsed_time))
+                            _LOGGER.debug(
+                                "("
+                                + entity_id
+                                + ") elapsed_time = "
+                                + str(elapsed_time)
+                            )
                             elapsed_seconds = elapsed_time.total_seconds()
-                            _LOGGER.debug("(" + entity_id + ") elapsed_seconds = " + str(elapsed_seconds))
-                                
+                            _LOGGER.debug(
+                                "("
+                                + entity_id
+                                + ") elapsed_seconds = "
+                                + str(elapsed_seconds)
+                            )
+
                             if elapsed_seconds > 0:
-                                speed_during_interval = distance_traveled / elapsed_seconds
-                                _LOGGER.debug("(" + entity_id + ") speed_during_interval = " + str(speed_during_interval) + " meters/sec")
+                                speed_during_interval = (
+                                    distance_traveled / elapsed_seconds
+                                )
+                                _LOGGER.debug(
+                                    "("
+                                    + entity_id
+                                    + ") speed_during_interval = "
+                                    + str(speed_during_interval)
+                                    + " meters/sec"
+                                )
                             else:
                                 speed_during_interval = 0
-                            
+
                             old_distance_from_home = 0
-                            if 'meters_from_home' in target.attributes:
-                                old_distance_from_home = float(target.attributes['meters_from_home'])
-                            
-                            if 'reported_state' in target.attributes and target.attributes['reported_state'].lower() == 'home':
-                                distance_from_home = 0          # clamp it down since "Home" is not a single point
-                            elif (new_latitude != 'None' and new_longitude != 'None' and pli.attributes['home_latitude'] != 'None' and pli.attributes['home_longitude'] != 'None'):
-                                distance_from_home = round(distance(float(new_latitude), float(new_longitude), float(pli.attributes['home_latitude']), float(pli.attributes['home_longitude'])),3)
+                            if "meters_from_home" in target.attributes:
+                                old_distance_from_home = float(
+                                    target.attributes["meters_from_home"]
+                                )
+
+                            if (
+                                "reported_state" in target.attributes
+                                and target.attributes["reported_state"].lower()
+                                == "home"
+                            ):
+                                distance_from_home = 0  # clamp it down since "Home" is not a single point
+                            elif (
+                                new_latitude != "None"
+                                and new_longitude != "None"
+                                and pli.attributes["home_latitude"] != "None"
+                                and pli.attributes["home_longitude"] != "None"
+                            ):
+                                distance_from_home = round(
+                                    distance(
+                                        float(new_latitude),
+                                        float(new_longitude),
+                                        float(pli.attributes["home_latitude"]),
+                                        float(pli.attributes["home_longitude"]),
+                                    ),
+                                    3,
+                                )
                             else:
-                                distance_from_home = 0          # could only happen if we don't have coordinates
-                            _LOGGER.debug("(" + entity_id + ") meters_from_home = " + str(distance_from_home))
-                            target.attributes['meters_from_home'] = str(round(distance_from_home,1))
-                            target.attributes['miles_from_home'] = str(round(distance_from_home / METERS_PER_MILE,1))
+                                distance_from_home = (
+                                    0  # could only happen if we don't have coordinates
+                                )
+                            _LOGGER.debug(
+                                "("
+                                + entity_id
+                                + ") meters_from_home = "
+                                + str(distance_from_home)
+                            )
+                            target.attributes["meters_from_home"] = str(
+                                round(distance_from_home, 1)
+                            )
+                            target.attributes["miles_from_home"] = str(
+                                round(distance_from_home / METERS_PER_MILE, 1)
+                            )
 
                             if speed_during_interval <= 0.5:
-                                direction = 'stationary'
+                                direction = "stationary"
                             elif old_distance_from_home > distance_from_home:
-                                direction = 'toward home'
+                                direction = "toward home"
                             elif old_distance_from_home < distance_from_home:
-                                direction = 'away from home'
+                                direction = "away from home"
                             else:
-                                direction = 'stationary'
-                            _LOGGER.debug("(" + entity_id + ") direction = " + direction)
-                            target.attributes['direction'] = direction
+                                direction = "stationary"
+                            _LOGGER.debug(
+                                "(" + entity_id + ") direction = " + direction
+                            )
+                            target.attributes["direction"] = direction
 
                             if pli.configured_osm_api_key != CONF_API_KEY_NOT_SET:
                                 """Call the Open Street Map (Nominatim) API if osm_api_key is configured"""
                                 if pli.configured_osm_api_key == CONF_API_KEY_NOT_SET:
-                                    osm_url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + str(new_latitude) + "&lon=" + str(new_longitude) + "&addressdetails=1&namedetails=1&zoom=18&limit=1"
+                                    osm_url = (
+                                        "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="
+                                        + str(new_latitude)
+                                        + "&lon="
+                                        + str(new_longitude)
+                                        + "&addressdetails=1&namedetails=1&zoom=18&limit=1"
+                                    )
                                 else:
-                                    osm_url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + str(new_latitude) + "&lon=" + str(new_longitude) + "&addressdetails=1&namedetails=1&zoom=18&limit=1&email=" + pli.configured_osm_api_key
+                                    osm_url = (
+                                        "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="
+                                        + str(new_latitude)
+                                        + "&lon="
+                                        + str(new_longitude)
+                                        + "&addressdetails=1&namedetails=1&zoom=18&limit=1&email="
+                                        + pli.configured_osm_api_key
+                                    )
 
                                 osm_decoded = {}
                                 osm_response = get(osm_url)
                                 osm_json_input = osm_response.text
                                 osm_decoded = json.loads(osm_json_input)
                                 decoded = osm_decoded
-                                
-                                if 'city' in osm_decoded['address']:
-                                    locality = osm_decoded['address']['city']
-                                elif 'town' in osm_decoded['address']:
-                                    locality = osm_decoded['address']['town']
-                                elif 'villiage' in osm_decoded['address']:
-                                    locality = osm_decoded['address']['village']
-                                elif 'municipality' in osm_decoded['address']:
-                                    locality = osm_decoded['address']['municipality']
-                                elif 'county' in osm_decoded['address']:
-                                    locality = osm_decoded['address']['county']
-                                elif 'state' in osm_decoded['address']:
-                                    locality = osm_decoded['address']['state']
-                                elif 'country' in osm_decoded['address']:
-                                    locality = osm_decoded['address']['country']
+
+                                if "city" in osm_decoded["address"]:
+                                    locality = osm_decoded["address"]["city"]
+                                elif "town" in osm_decoded["address"]:
+                                    locality = osm_decoded["address"]["town"]
+                                elif "villiage" in osm_decoded["address"]:
+                                    locality = osm_decoded["address"]["village"]
+                                elif "municipality" in osm_decoded["address"]:
+                                    locality = osm_decoded["address"]["municipality"]
+                                elif "county" in osm_decoded["address"]:
+                                    locality = osm_decoded["address"]["county"]
+                                elif "state" in osm_decoded["address"]:
+                                    locality = osm_decoded["address"]["state"]
+                                elif "country" in osm_decoded["address"]:
+                                    locality = osm_decoded["address"]["country"]
                                 else:
-                                    locality = '?'
-                                _LOGGER.debug("(" + entity_id + ") locality = " + locality)
-                                
-                                if 'display_name' in osm_decoded:
-                                    display_name = osm_decoded['display_name']
-                                else: 
+                                    locality = "?"
+                                _LOGGER.debug(
+                                    "(" + entity_id + ") locality = " + locality
+                                )
+
+                                if "display_name" in osm_decoded:
+                                    display_name = osm_decoded["display_name"]
+                                else:
                                     display_name = locality
-                                _LOGGER.debug("(" + entity_id + ") display_name = " + display_name)
+                                _LOGGER.debug(
+                                    "(" + entity_id + ") display_name = " + display_name
+                                )
 
-                                target.attributes['friendly_name'] = template.replace('<locality>',locality)
-                                target.attributes['Open_Street_Map'] = display_name.replace(', ',' ')
+                                target.attributes["friendly_name"] = template.replace(
+                                    "<locality>", locality
+                                )
+                                target.attributes[
+                                    "Open_Street_Map"
+                                ] = display_name.replace(", ", " ")
 
-                                if 'licence' in osm_decoded:
-                                    attribution += '"' + osm_decoded['licence'] + '"; '
+                                if "licence" in osm_decoded:
+                                    attribution += '"' + osm_decoded["licence"] + '"; '
 
                             if pli.configured_google_api_key != CONF_API_KEY_NOT_SET:
                                 """Call the Google Maps Reverse Geocoding API if google_api_key is configured"""
                                 """https://developers.google.com/maps/documentation/geocoding/overview?hl=en_US#ReverseGeocoding"""
-                                google_url = 'https://maps.googleapis.com/maps/api/geocode/json?language=' + pli.configured_language + '&region=' + pli.configured_region + '&latlng=' + str(new_latitude) + ',' + str(new_longitude) + "&key=" + pli.configured_google_api_key
+                                google_url = (
+                                    "https://maps.googleapis.com/maps/api/geocode/json?language="
+                                    + pli.configured_language
+                                    + "&region="
+                                    + pli.configured_region
+                                    + "&latlng="
+                                    + str(new_latitude)
+                                    + ","
+                                    + str(new_longitude)
+                                    + "&key="
+                                    + pli.configured_google_api_key
+                                )
                                 google_decoded = {}
-                    #            _LOGGER.debug( "(" + entity_id + ") url - " + google_url)
+                                #            _LOGGER.debug( "(" + entity_id + ") url - " + google_url)
                                 google_response = get(google_url)
                                 google_json_input = google_response.text
-                    #            _LOGGER.debug( "(" + entity_id + ") response - " + google_json_input)
+                                #            _LOGGER.debug( "(" + entity_id + ") response - " + google_json_input)
                                 google_decoded = json.loads(google_json_input)
-                                    
-                                google_status = google_decoded['status']
-                                if google_status != 'OK':
-                                    _LOGGER.debug( '(' + entity_id + ') google_status = ' + google_status)
+
+                                google_status = google_decoded["status"]
+                                if google_status != "OK":
+                                    _LOGGER.debug(
+                                        "("
+                                        + entity_id
+                                        + ") google_status = "
+                                        + google_status
+                                    )
                                 else:
-                                    if 'results' in google_decoded:
-                    #                    for result in google_decoded['results']:
-                    #                        location_type = 'none'
-                    #                        if 'geometry' in result:
-                    #                            if 'location_type' in result['geometry']:
-                    #                                location_type = result['geometry']['location_type']
-                    #                        if 'formatted_address' in result:
-                    #                            formatted_address = result['formatted_address']
-                    #                        else:
-                    #                            formatted_address = 'none'
-                    #                        _LOGGER.debug( '(' + entity_id + ') location_type = ' + location_type + '; formatted_address = ' + formatted_address)
-                                        if 'formatted_address' in google_decoded['results'][0]:
-                                            formatted_address = google_decoded['results'][0]['formatted_address']
-                                            _LOGGER.debug( "(" + entity_id + ") formatted_address = " + formatted_address)
-                                            target.attributes['Google_Maps'] = formatted_address
-                                        for component in google_decoded['results'][0]['address_components']:
-                                            _LOGGER.debug( '(' + entity_id + ') address_components ' + str(component['types']) + " = " + component["long_name"])
-                                            if 'locality' in component['types']:
-                                                locality = component['long_name']
-                                                _LOGGER.debug('(' + entity_id + ') locality = ' + locality)
-                                                target.attributes['friendly_name'] = template.replace('<locality>',locality)
+                                    if "results" in google_decoded:
+                                        #                    for result in google_decoded['results']:
+                                        #                        location_type = 'none'
+                                        #                        if 'geometry' in result:
+                                        #                            if 'location_type' in result['geometry']:
+                                        #                                location_type = result['geometry']['location_type']
+                                        #                        if 'formatted_address' in result:
+                                        #                            formatted_address = result['formatted_address']
+                                        #                        else:
+                                        #                            formatted_address = 'none'
+                                        #                        _LOGGER.debug( '(' + entity_id + ') location_type = ' + location_type + '; formatted_address = ' + formatted_address)
+                                        if (
+                                            "formatted_address"
+                                            in google_decoded["results"][0]
+                                        ):
+                                            formatted_address = google_decoded[
+                                                "results"
+                                            ][0]["formatted_address"]
+                                            _LOGGER.debug(
+                                                "("
+                                                + entity_id
+                                                + ") formatted_address = "
+                                                + formatted_address
+                                            )
+                                            target.attributes[
+                                                "Google_Maps"
+                                            ] = formatted_address
+                                        for component in google_decoded["results"][0][
+                                            "address_components"
+                                        ]:
+                                            _LOGGER.debug(
+                                                "("
+                                                + entity_id
+                                                + ") address_components "
+                                                + str(component["types"])
+                                                + " = "
+                                                + component["long_name"]
+                                            )
+                                            if "locality" in component["types"]:
+                                                locality = component["long_name"]
+                                                _LOGGER.debug(
+                                                    "("
+                                                    + entity_id
+                                                    + ") locality = "
+                                                    + locality
+                                                )
+                                                target.attributes[
+                                                    "friendly_name"
+                                                ] = template.replace(
+                                                    "<locality>", locality
+                                                )
                                         attribution += '"powered by Google"; '
 
-                            target.attributes['location_latitude'] = new_latitude
-                            target.attributes['location_longitude'] = new_longitude
-                            target.attributes['location_update_time'] = str(new_update_time)
+                            target.attributes["location_latitude"] = new_latitude
+                            target.attributes["location_longitude"] = new_longitude
+                            target.attributes["location_update_time"] = str(
+                                new_update_time
+                            )
 
                             """WazeRouteCalculator is checked if not at Home."""
                             if distance_from_home <= 0:
                                 routeTime = 0
                                 routeDistance = 0
-                                target.attributes['driving_miles'] = '0'
-                                target.attributes['driving_minutes'] = '0'
+                                target.attributes["driving_miles"] = "0"
+                                target.attributes["driving_minutes"] = "0"
                             else:
                                 try:
-                                    _LOGGER.debug('(' + entity_id + ') Waze calculation' )
+                                    _LOGGER.debug(
+                                        "(" + entity_id + ") Waze calculation"
+                                    )
                                     import WazeRouteCalculator
-                                    from_address = str(new_latitude) + ',' + str(new_longitude)
-                                    to_address = str(pli.attributes['home_latitude']) + ',' + str(pli.attributes['home_longitude'])
-                                    route = WazeRouteCalculator.WazeRouteCalculator(from_address, to_address, pli.configured_region, avoid_toll_roads=True)
+
+                                    from_address = (
+                                        str(new_latitude) + "," + str(new_longitude)
+                                    )
+                                    to_address = (
+                                        str(pli.attributes["home_latitude"])
+                                        + ","
+                                        + str(pli.attributes["home_longitude"])
+                                    )
+                                    route = WazeRouteCalculator.WazeRouteCalculator(
+                                        from_address,
+                                        to_address,
+                                        pli.configured_region,
+                                        avoid_toll_roads=True,
+                                    )
                                     routeTime, routeDistance = route.calc_route_info()
-                                    _LOGGER.debug("(" + entity_id + ") Waze routeDistance " + str(routeDistance) )  # km
-                                    routeDistance = routeDistance * METERS_PER_KM / METERS_PER_MILE                          # miles
+                                    _LOGGER.debug(
+                                        "("
+                                        + entity_id
+                                        + ") Waze routeDistance "
+                                        + str(routeDistance)
+                                    )  # km
+                                    routeDistance = (
+                                        routeDistance * METERS_PER_KM / METERS_PER_MILE
+                                    )  # miles
                                     if routeDistance >= 100:
-                                        target.attributes['driving_miles'] = str(round(routeDistance,0))
+                                        target.attributes["driving_miles"] = str(
+                                            round(routeDistance, 0)
+                                        )
                                     elif routeDistance >= 10:
-                                        target.attributes['driving_miles'] = str(round(routeDistance,1))
+                                        target.attributes["driving_miles"] = str(
+                                            round(routeDistance, 1)
+                                        )
                                     else:
-                                        target.attributes['driving_miles'] = str(round(routeDistance,2))
-                                    _LOGGER.debug("(" + entity_id + ") Waze routeTime " + str(routeTime) )          # minutes
-                                    target.attributes['driving_minutes'] = str(round(routeTime,1))
-                                    attribution += '"Data by Waze App. https://waze.com"; ' 
+                                        target.attributes["driving_miles"] = str(
+                                            round(routeDistance, 2)
+                                        )
+                                    _LOGGER.debug(
+                                        "("
+                                        + entity_id
+                                        + ") Waze routeTime "
+                                        + str(routeTime)
+                                    )  # minutes
+                                    target.attributes["driving_minutes"] = str(
+                                        round(routeTime, 1)
+                                    )
+                                    attribution += (
+                                        '"Data by Waze App. https://waze.com"; '
+                                    )
                                 except Exception as e:
-                                    _LOGGER.error("(" + entity_id + ") Waze Exception - " + str(e))
+                                    _LOGGER.error(
+                                        "(" + entity_id + ") Waze Exception - " + str(e)
+                                    )
                                     _LOGGER.debug(traceback.format_exc())
-                                    pli.attributes['waze_error_count'] += 1
-                                    target.attributes.pop('driving_miles')
-                                    target.attributes.pop('driving_minutes')
+                                    pli.attributes["waze_error_count"] += 1
+                                    target.attributes.pop("driving_miles")
+                                    target.attributes.pop("driving_minutes")
 
                         target.attributes[ATTR_ATTRIBUTION] = attribution
 
-                #        _LOGGER.debug("(" + entity_id + ") Setting " + entity_id)
-                #        hass.states.set(entity_id,target.state,target.attributes)
                         target.set_state()
             except Exception as e:
                 _LOGGER.error("(" + entity_id + ") Exception - " + str(e))
                 _LOGGER.debug(traceback.format_exc())
-                pli.attributes['api_error_count'] += 1
+                pli.attributes["api_error_count"] += 1
+
             pli.set_state()
             _LOGGER.debug("(" + entity_id + ") Finish " + DOMAIN + ".reverse_geocode")
 
@@ -326,7 +553,7 @@ def setup(hass, config):
         with integration_lock:
             """Lock while updating the pli(API_STATE_OBJECT)."""
             _LOGGER.debug("Setting " + API_STATE_OBJECT + " on")
-            pli.state = 'on'
+            pli.state = "on"
             pli.set_state()
         _LOGGER.debug("Finish " + DOMAIN + ".geocode_api_on")
 
@@ -337,15 +564,15 @@ def setup(hass, config):
         with integration_lock:
             """Lock while updating the pli(API_STATE_OBJECT)."""
             _LOGGER.debug("Setting " + API_STATE_OBJECT + " off")
-            pli.state = 'off'
+            pli.state = "off"
             pli.set_state()
         _LOGGER.debug("Finish " + DOMAIN + ".geocode_api_off")
 
-    hass.services.register(DOMAIN, 'reverse_geocode', handle_reverse_geocode)
-    hass.services.register(DOMAIN, 'geocode_api_on', handle_geocode_api_on)
-    hass.services.register(DOMAIN, 'geocode_api_off', handle_geocode_api_off)
+    hass.services.register(DOMAIN, "reverse_geocode", handle_reverse_geocode)
+    hass.services.register(DOMAIN, "geocode_api_on", handle_geocode_api_on)
+    hass.services.register(DOMAIN, "geocode_api_off", handle_geocode_api_off)
 
-#    hass.states.set(pli.name, pli.state, pli.attributes)
+    #    hass.states.set(pli.name, pli.state, pli.attributes)
     pli.set_state()
 
     # Return boolean to indicate that setup was successful.
