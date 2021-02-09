@@ -52,6 +52,7 @@ from .const import (
     ISSUE_URL,
     METERS_PER_KM,
     METERS_PER_MILE,
+    MIN_DISTANCE_TRAVELLED,
     PERSON_LOCATION_ENTITY,
     PERSON_LOCATION_INTEGRATION,
     THROTTLE_INTERVAL,
@@ -73,9 +74,9 @@ def setup(hass, config):
         entity_id = call.data.get(CONF_ENTITY_ID, "NONE")
         template = call.data.get(CONF_FRIENDLY_NAME_TEMPLATE, "NONE")
 
-        _LOGGER.debug("(" + entity_id + ") Start " + DOMAIN + ".reverse_geocode")
+        _LOGGER.debug("(%s) Start %s.reverse_geocode" % (entity_id, DOMAIN))
         _LOGGER.debug(
-            "(" + entity_id + ") " + CONF_FRIENDLY_NAME_TEMPLATE + " = " + template
+            "(%s) %s = %s" % (entity_id, CONF_FRIENDLY_NAME_TEMPLATE, template)
         )
 
         with integration_lock:
@@ -85,26 +86,26 @@ def setup(hass, config):
 
                 if pli.state.lower() != "on":
                     """Allow API calls to be paused."""
-                    pli.attributes["skipped_api_calls"] += 1
+                    pli.attributes["api_calls_skipped"] += 1
                     _LOGGER.debug(
-                        "(%s) skipped_api_calls = %d"
-                        % (entity_id, pli.attributes["skipped_api_calls"])
+                        "(%s) api_calls_skipped = %d"
+                        % (entity_id, pli.attributes["api_calls_skipped"])
                     )
                 else:
                     """Throttle the API calls so that we don't exceed policy."""
                     wait_time = (
-                        pli.attributes["last_api_time"]
+                        pli.attributes["api_last_updated"]
                         - currentApiTime
                         + THROTTLE_INTERVAL
                     ).total_seconds()
                     if wait_time > 0:
-                        pli.attributes["throttled_api_calls"] += 1
+                        pli.attributes["api_calls_throttled"] += 1
                         _LOGGER.debug(
-                            "(%s) wait_time = %05.3f; throttled_api_calls = %d"
+                            "(%s) wait_time = %05.3f; api_calls_throttled = %d"
                             % (
                                 entity_id,
                                 wait_time,
-                                pli.attributes["throttled_api_calls"],
+                                pli.attributes["api_calls_throttled"],
                             )
                         )
                         time.sleep(wait_time)
@@ -112,9 +113,9 @@ def setup(hass, config):
 
                     """Record the integration attributes in the API_STATE_OBJECT."""
 
-                    pli.attributes["last_api_time"] = currentApiTime
+                    pli.attributes["api_last_updated"] = currentApiTime
 
-                    pli.attributes["attempted_api_calls"] += 1
+                    pli.attributes["api_calls_attempted"] += 1
 
                     counter_attribute = f"{entity_id} calls"
                     if counter_attribute in pli.attributes:
@@ -186,7 +187,7 @@ def setup(hass, config):
                                 + ") Skipping geocoding because coordinates are missing"
                             )
                         elif (
-                            distance_traveled < 10
+                            distance_traveled < MIN_DISTANCE_TRAVELLED
                             and old_latitude != "None"
                             and old_longitude != "None"
                         ):
@@ -539,7 +540,7 @@ def setup(hass, config):
 
                         target.set_state()
             except Exception as e:
-                _LOGGER.error("(" + entity_id + ") Exception - " + str(e))
+                _LOGGER.error("(%s) Exception - %s" % (entity_id, str(e)))
                 _LOGGER.debug(traceback.format_exc())
                 pli.attributes["api_error_count"] += 1
 

@@ -126,7 +126,6 @@ If you find problems with the OSM information, feel free to sign up at https://w
 To activate the custom integration with the Open Street Map geocoding feature, add a contact email address to `<config>/configuration.yaml`.
 ```yaml
 # Example configuration.yaml entry
-
 person_location:
     osm_api_key: !secret gmail_address
 ```
@@ -145,7 +144,6 @@ The Google Maps Geocoding feature adds the following attribute names to the sens
 To activate the custom integration with the Google Maps Geocoding feature, add a Google API Key to `<config>/configuration.yaml`. A Google API Key can be obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). Unfortunately, obtaining a Key requires that billing be set up. Their free tier is generous for our purposes, but if it gives you the heebie-jeebies to give Google a credit card, stick with Open Street Map.
 ```yaml
 # Example configuration.yaml entry
-
 person_location:
     google_api_key: !secret google_api_key
 ```
@@ -174,6 +172,11 @@ person_location:
 | `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. Default: do not do the OSM reverse geocoding.
 | `region`         | Yes | Region parameter for the Google API. Default: `US`
 
+If you use the iCloud3 integration, the following setting helps with showing the zone and icon when you have an apostrophe in the friendly name.
+```yaml
+# config_ic3.yaml
+display_zone_format: fname
+```
 ### **Lovelace Examples**
 
 Show system information for the Person Location integration (especially during testing).

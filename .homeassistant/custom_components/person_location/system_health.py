@@ -28,17 +28,17 @@ async def system_health_info(hass):
 
         return_info["State"] = apiState
 
-        attr_value = apiAttributesObject["attempted_api_calls"]
+        attr_value = apiAttributesObject["api_calls_attempted"]
         if attr_value != 0:
-            return_info["Attempted API Calls"] = attr_value
+            return_info["API Calls Attempted"] = attr_value
 
-        attr_value = apiAttributesObject["skipped_api_calls"]
+        attr_value = apiAttributesObject["api_calls_skipped"]
         if attr_value != 0:
-            return_info["Skipped API Calls"] = attr_value
+            return_info["API Calls Skipped"] = attr_value
 
-        attr_value = apiAttributesObject["throttled_api_calls"]
+        attr_value = apiAttributesObject["api_calls_throttled"]
         if attr_value != 0:
-            return_info["Throttled API Calls"] = attr_value
+            return_info["API Calls Throttled"] = attr_value
 
         attr_value = apiAttributesObject["api_error_count"]
         if attr_value != 0:

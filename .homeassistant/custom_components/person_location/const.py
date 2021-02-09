@@ -17,17 +17,20 @@ from integrationhelper.const import CC_STARTUP_VERSION
 DOMAIN = "person_location"
 INTEGRATION_NAME = "Person Location"
 ISSUE_URL = "https://github.com/rodpayne/home-assistant/issues"
-VERSION = "2021.02.06"
+VERSION = "2021.02.08"
+
+# Fixed Parameters
+MIN_DISTANCE_TRAVELLED = 5
+THROTTLE_INTERVAL = timedelta(
+    seconds=1
+)  # See https://operations.osmfoundation.org/policies/nominatim/ regarding throttling.
 
 # Constants
 API_STATE_OBJECT = DOMAIN + "." + DOMAIN + "_api"
 METERS_PER_KM = 1000
 METERS_PER_MILE = 1609.34
-THROTTLE_INTERVAL = timedelta(
-    seconds=1
-)  # See https://operations.osmfoundation.org/policies/nominatim/ regarding throttling.
 
-# Configuration
+# Configuration Parameters
 CONF_LANGUAGE = "language"
 DEFAULT_LANGUAGE = "en"
 
@@ -80,11 +83,11 @@ class PERSON_LOCATION_INTEGRATION:
         self.attributes["home_longitude"] = str(
             self.hass.states.get(home_zone).attributes.get(ATTR_LONGITUDE)
         )
-        self.attributes["last_api_time"] = datetime.now()
+        self.attributes["api_last_updated"] = datetime.now()
         self.attributes["api_error_count"] = 0
-        self.attributes["attempted_api_calls"] = 0
-        self.attributes["skipped_api_calls"] = 0
-        self.attributes["throttled_api_calls"] = 0
+        self.attributes["api_calls_attempted"] = 0
+        self.attributes["api_calls_skipped"] = 0
+        self.attributes["api_calls_throttled"] = 0
         self.attributes["waze_error_count"] = 0
         self.attributes[
             ATTR_ATTRIBUTION

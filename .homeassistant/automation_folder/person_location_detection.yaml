@@ -19,7 +19,7 @@
   - service: python_script.person_location_update
     data_template:
       entity_id: '{{trigger.entity_id}}'
-      state_change: 'Home'
+      change_state_to: 'Home'
 
 - alias: Mark person location as Away
   initial_state: 'on'
@@ -38,7 +38,7 @@
   - service: python_script.person_location_update
     data_template:
       entity_id: '{{trigger.entity_id}}'
-      state_change: 'Away'
+      change_state_to: 'Away'
 
 - alias: Mark person location as Extended Away
   initial_state: 'on'
@@ -57,7 +57,7 @@
   - service: python_script.person_location_update
     data_template:
       entity_id: '{{trigger.entity_id}}'
-      state_change: 'Extended Away'
+      change_state_to: 'Extended Away'
 
 #----------------------------------------------------------------------------------------------------------
 # Determine presence from device tracker indicators
@@ -140,3 +140,16 @@
 #      from_state: '{{trigger.from_state.state}}'
 #      to_state: '{{trigger.to_state.state}}'
 
+
+- alias: Refresh iCloud3 after the garage door is closed
+  initial_state: 'on'
+  trigger:
+  - platform: state
+    entity_id: sensor.garage_door
+    to: 'Closed'
+    for:
+      seconds: 30
+  action:
+  - service: device_tracker.icloud3_update
+    data_template:
+      command: location
