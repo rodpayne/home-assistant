@@ -9,8 +9,8 @@
 * [Components](#components)
   * [File automation_folder/person_location_detection](#file-automation_folderperson_location_detectionyaml)
     * [Device tracker requirements (input)](#device-tracker-requirements-input)
-  * [File python_scripts/person_location_update.py](#file-python_scriptsperson_location_updatepy)
     * [Person sensor example (output)](#person-sensor-example-output)
+  * [Service person_location/process_trigger](#service-person_locationprocess_trigger)
   * [Folder custom_components/person_location](#folder-custom_componentsperson_location)
     * [Open Street Map Geocoding](#open-street-map-geocoding)
       * [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
@@ -41,7 +41,7 @@ The optional custom integration supplies a service to reverse geocode the locati
 ## Components
 
 ### **File automation_folder/person_location_detection.yaml**
-This automation file contains the example automations that call the person_sensor_update.py script.  These automations determine which device trackers will be watched for events that will trigger processing. 
+This automation file contains the example automations that call the person_location/process_trigger service.  These automations determine which device trackers will be watched for events that will trigger processing. 
 
 Automations `Mark person location as Home`, `Mark person location as Away`, and `Mark person location as Extended Away` each need to have the complete list of Person Trackers.  (A future enhancement may find a way to maintain the list automatically.) 
 
@@ -64,12 +64,14 @@ In the case of the [Apple iCloud integration](https://www.home-assistant.io/inte
   account_name: Rod
 ```
 
-### **File python_scripts/person_location_update.py** 
-This is a script that is called by automation `Person Location Update` following a state change of a device tracker such as a phone, watch, or car.  It creates/updates a Home Assistant sensor named `sensor.<personName>_location`.
+### **Service person_location/process_trigger** 
+This is the service that is called by automation `Person Location Update` following a state change of a device tracker such as a phone, watch, or car.  It creates/updates a Home Assistant sensor named `sensor.<personName>_location`.
 	
 The sensor will be updated with a state such as `Just Arrived`, `Home`, `Just Left`, `Away`, or `Extended Away`.  In addition, selected attributes from the triggered device tracker will be copied to the sensor.  Attributes `source` (the triggering entity ID), `reported_state` (the state reported by the device tracker), `icon` (for the current zone), and `friendly_name` (the status of the person) will be updated.
 	
 Note that the person sensor state is triggered by state changes such as a device changing zones, so a phone left at home does not get a vote for "home".  The assumption is that if the device is moving, then the person has it.  An effort is also made to show more respect to devices with a higher GPS accuracy.
+
+If you prefer the selection priority that the built-in Person integration provides, only call the person_location service for the `person.<personName>` tracker rather than the upstream device trackers.  Do not mix the two.
 
 #### **Person sensor example (output)**
 
@@ -104,8 +106,6 @@ By default, the custom integration will add the following attribute names to the
 | location_longitude: | -xxx.60796996859035 | saved for next calculations |
 | location_update_time: | 2021-01-31 21:14:28.071609 | saved for next calculations |
 
-If the custom integration is not installed, script `person_location_update.py` will gracefully go on without it. 
-
 *Attribution:* "Data provided by Waze App. Learn more at [Waze.com](https://www.waze.com)"
 
 #### **Open Street Map Geocoding**
@@ -126,7 +126,6 @@ If you find problems with the OSM information, feel free to sign up at https://w
 To activate the custom integration with the Open Street Map geocoding feature, add a contact email address to `<config>/configuration.yaml`.
 ```yaml
 # Example configuration.yaml entry
-
 person_location:
     osm_api_key: !secret gmail_address
 ```
@@ -145,7 +144,6 @@ The Google Maps Geocoding feature adds the following attribute names to the sens
 To activate the custom integration with the Google Maps Geocoding feature, add a Google API Key to `<config>/configuration.yaml`. A Google API Key can be obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). Unfortunately, obtaining a Key requires that billing be set up. Their free tier is generous for our purposes, but if it gives you the heebie-jeebies to give Google a credit card, stick with Open Street Map.
 ```yaml
 # Example configuration.yaml entry
-
 person_location:
     google_api_key: !secret google_api_key
 ```
@@ -174,6 +172,11 @@ person_location:
 | `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. Default: do not do the OSM reverse geocoding.
 | `region`         | Yes | Region parameter for the Google API. Default: `US`
 
+If you use the iCloud3 integration, the following setting helps with showing the zone and icon when you have an apostrophe in the friendly name.
+```yaml
+# config_ic3.yaml
+display_zone_format: fname
+```
 ### **Lovelace Examples**
 
 Show system information for the Person Location integration (especially during testing).

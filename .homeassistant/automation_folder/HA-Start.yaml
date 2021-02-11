@@ -60,7 +60,7 @@
     entity_id: automation.ha_just_started 
     to: 'on'    
     for:
-      minutes: 3
+      minutes: 2
   action:
     service: automation.turn_off
     data_template:
