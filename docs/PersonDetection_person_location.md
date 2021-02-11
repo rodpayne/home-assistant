@@ -9,7 +9,7 @@
 * [Components](#components)
   * [File automation_folder/person_location_detection](#file-automation_folderperson_location_detectionyaml)
     * [Device tracker requirements (input)](#device-tracker-requirements-input)
-    * [Person sensor example (output)](#person-sensor-example-output)
+    * [Person location sensor example (output)](#person-location-sensor-example-output)
   * [Service person_location/process_trigger](#service-person_locationprocess_trigger)
   * [Folder custom_components/person_location](#folder-custom_componentsperson_location)
     * [Open Street Map Geocoding](#open-street-map-geocoding)
@@ -36,7 +36,7 @@ When a person is detected as moving between `Home` and `Away`, instead of going 
 *Inspired by <https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/>* 
 
 ### **Reverse geocode the location and make calculations**
-The optional custom integration supplies a service to reverse geocode the location (making it human readable) using either `Open Street Map` or `Google Maps` and calculate the distance from home (miles and minutes) using `WazeRouteCalculator`.  
+The custom integration supplies a service to reverse geocode the location (making it human readable) using either `Open Street Map` or `Google Maps` and calculate the distance from home (miles and minutes) using `WazeRouteCalculator`.  
 
 ## Components
 
@@ -69,14 +69,14 @@ This is the service that is called by automation `Person Location Update` follow
 	
 The sensor will be updated with a state such as `Just Arrived`, `Home`, `Just Left`, `Away`, or `Extended Away`.  In addition, selected attributes from the triggered device tracker will be copied to the sensor.  Attributes `source` (the triggering entity ID), `reported_state` (the state reported by the device tracker), `icon` (for the current zone), and `friendly_name` (the status of the person) will be updated.
 	
-Note that the person sensor state is triggered by state changes such as a device changing zones, so a phone left at home does not get a vote for "home".  The assumption is that if the device is moving, then the person has it.  An effort is also made to show more respect to devices with a higher GPS accuracy.
+Note that the person location sensor state is triggered by state changes such as a device changing zones, so a phone left at home does not get a vote for "home".  The assumption is that if the device is moving, then the person has it.  An effort is also made to show more respect to devices with a higher GPS accuracy.
 
 If you prefer the selection priority that the built-in Person integration provides, only call the person_location service for the `person.<personName>` tracker rather than the upstream device trackers.  Do not mix the two.
 
-#### **Person sensor example (output)**
+#### **Person location sensor example (output)**
 
-| Entity              | State | Attribute Name | Value         | Description |
-| :------------------ | :---: | :------------- | :------------ | :---------- |
+| Entity              | State | Attribute Name | Example         | Description |
+| :------------------ | :---: | :------------- | :-------------- | :---------- |
 | sensor.rod_location | Home	| source_type:   | gps | `source_type` copied from device tracker |
 |                     |       | latitude:      | xx.136566162109375 | `latitude` copied from device tracker |
 | | | longitude: | -xxx.60774422200406 | `longitude` copied from device tracker |
@@ -91,12 +91,12 @@ If you prefer the selection priority that the built-in Person integration provid
 
 
 ### **Folder custom_components/person_location**
-For meaningful results, the device trackers will need to include `latitude` and `longitude` attributes, as in Mobile App, iCloud, and iCloud3 device trackers.  These location features will be skipped for updates triggered by device trackers that do not know the location coordinates.  
+For meaningful results, the device trackers will need to include `latitude` and `longitude` attributes, as in Mobile App, iCloud, and iCloud3 device trackers.  The location features will be skipped for updates triggered by device trackers that do not know the location coordinates.  
 
 By default, the custom integration will add the following attribute names to the sensor.
 
-| Attribute Name            | Value | Description |
-| :------------------------ | :---- | :---------- |
+| Attribute Name            | Example | Description |
+| :------------------------ | :------ | :---------- |
 | meters_from_home: | 71862.3 | calculated distance from Home (meters) |
 | miles_from_home: | 44.7     | calculated distance from Home (miles) |
 | direction: | stationary     | direction from Home |
@@ -111,12 +111,12 @@ By default, the custom integration will add the following attribute names to the
 #### **Open Street Map Geocoding**
 The Open Street Map Geocoding feature adds the following attribute names to the sensor.
 
-| Attribute Name            | Value | Description |
-| :------------------------ | :---- | :---------- |
+| Attribute Name            | Example | Description |
+| :------------------------ | :------ | :---------- |
 | OSM_location: | 1313 Mockingbird Lane Hollywood Los Angeles California 90038 United States | `display_name` from Open Street Map |
 | friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
 
-Open Street Map (Nominatim) has [a usage policy](https://operations.osmfoundation.org/policies/nominatim/) that limits the frequency of calls. The custom integration attempts to limit calls to less than once per second, possibly skipping an update until the next one comes along.  To meet the requirement to be able to switch off the service, the state of `person_location.person_location_api` can be changed to `Off`. This can be done by calling service `person_location.geocode_api_off` and then resumed later by calling service `person_location.geocode_api_on`.  The number of calls is also reduced by skipping updates while the person sensor state is `Home` or if the location has changed by less than 10 meters.  (It will update while the state is `Just Arrived`, so it will reflect the home location while home.)
+Open Street Map (Nominatim) has [a usage policy](https://operations.osmfoundation.org/policies/nominatim/) that limits the frequency of calls. The custom integration attempts to limit calls to less than once per second, possibly skipping an update until the next one comes along.  To meet the requirement to be able to switch off the service, the state of `person_location.person_location_api` can be changed to `Off`. This can be done by calling service `person_location.geocode_api_off` and then resumed later by calling service `person_location.geocode_api_on`.  The number of calls is also reduced by skipping updates while the person location sensor state is `Home` or if the location has changed by less than 10 meters.  (It will update while the state is `Just Arrived`, so it will reflect the home location while home.)
 
 If you find problems with the OSM information, feel free to sign up at https://www.openstreetmap.org/ and edit the map. 
 
@@ -133,8 +133,8 @@ person_location:
 #### **Google Maps Geocoding**
 The Google Maps Geocoding feature adds the following attribute names to the sensor.
 
-| Attribute Name            | Value | Description |
-| :------------------------ | :---- | :---------- |
+| Attribute Name            | Example | Description |
+| :------------------------ | :------ | :---------- |
 | google_location: | 1313 Mockingbird Ln, Los Angeles, CA 90038, USA | `formatted_address` from Google Maps |
 | friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
 
