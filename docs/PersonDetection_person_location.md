@@ -149,19 +149,15 @@ person_location:
 ```
 ## Installation
 ### **Manual Installation Hints**
-1. Create `<config>/python_scripts` folder if you haven't already.
+1. Copy the components into the appropriate folder under `<config>`.
 
-2. Add `python_script:` to `<config>/configuration.yaml` if you haven't already.
+2. Update file `<config>/automation_folder/presence-detection.yaml` as appropriate for your devices.  This file may need to be placed elsewhere or merged into `<config>automation.yaml`, depending on how your configuration is organized. My configuration is split into [multiple folders](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
 
-3. Copy the components into the appropriate folder under `<config>`.
+3. Restart Home Assistant.
 
-4. Update file `<config>/automation_folder/presence-detection.yaml` as appropriate for your devices.  This file may need to be placed elsewhere or merged into `<config>automation.yaml`, depending on how your configuration is organized. My configuration is split into [multiple folders](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
+4. Add configuration in `<config>/configuration.yaml`.
 
 5. Restart Home Assistant.
-
-6. Add configuration in `<config>/configuration.yaml`.
-
-7. Restart Home Assistant.
 
 ### **Configuration Parameters**
 
