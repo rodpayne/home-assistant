@@ -17,7 +17,7 @@ from integrationhelper.const import CC_STARTUP_VERSION
 DOMAIN = "person_location"
 INTEGRATION_NAME = "Person Location"
 ISSUE_URL = "https://github.com/rodpayne/home-assistant/issues"
-VERSION = "2021.02.08"
+VERSION = "2021.02.10"
 
 # Fixed Parameters
 MIN_DISTANCE_TRAVELLED = 5
@@ -106,7 +106,7 @@ class PERSON_LOCATION_INTEGRATION:
 
     def set_state(self):
         _LOGGER.debug(
-            "(%s.set_state()) - %s - %s", self.name, self.state, self.attributes
+            "(%s.set_state) - %s - %s", self.name, self.state, self.attributes
         )
         self.hass.states.set(self.name, self.state, self.attributes.copy())
 
@@ -117,18 +117,50 @@ class PERSON_LOCATION_ENTITY:
 
         self.name = name
         self.hass = _hass
-        self.lock = threading.Lock()
 
         targetStateObject = self.hass.states.get(self.name)
         if targetStateObject != None:
+            self.firstTime = False
             self.state = targetStateObject.state
             self.attributes = targetStateObject.attributes.copy()
         else:
+            self.firstTime = True
             self.state = "Unknown"
-            self.attrubutes = {}
+            self.attributes = {}
+
+        if "friendly_name" in self.attributes:
+            self.friendlyName = self.attributes["friendly_name"]
+        else:
+            self.friendlyName = ""
+            _LOGGER.debug("friendly_name attribute is missing")
+
+        if self.state.lower() == "home" or self.state.lower() == "on":
+            self.stateHomeAway = "Home"
+            self.state = "Home"
+        else:
+            self.stateHomeAway = "Away"
+            if self.state == "not_home":
+                self.state = "Away"
+
+        if "person_name" in self.attributes:
+            self.personName = self.attributes["person_name"]
+        elif "account_name" in self.attributes:
+            self.personName = self.attributes["account_name"]
+        elif "owner_fullname" in self.attributes:
+            self.personName = self.attributes["owner_fullname"].split()[0].lower()
+        else:
+            self.personName = self.name.split(".")[1].split("_")[0].lower()
+            if self.firstTime == False:
+                _LOGGER.warning(
+                    'The account_name (or person_name) attribute is missing in %s, trying "%s"',
+                    self.name,
+                    self.personName,
+                )
+
+        self.targetName = "sensor." + self.personName.lower() + "_location"
 
     def set_state(self):
         _LOGGER.debug(
-            "(%s.set_state()) - %s - %s", self.name, self.state, self.attributes
+            "(%s.set_state) - %s - %s", self.name, self.state, self.attributes
         )
         self.hass.states.set(self.name, self.state, self.attributes.copy())

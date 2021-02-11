@@ -16,10 +16,10 @@
     for:
       minutes: 3
   action:
-  - service: python_script.person_location_update
+  - service: person_location.delayed_state_change
     data_template:
       entity_id: '{{trigger.entity_id}}'
-      change_state_to: 'Home'
+      to_state: 'Home'
 
 - alias: Mark person location as Away
   initial_state: 'on'
@@ -35,10 +35,10 @@
     for:
       minutes: 3
   action:
-  - service: python_script.person_location_update
+  - service: person_location.delayed_state_change
     data_template:
       entity_id: '{{trigger.entity_id}}'
-      change_state_to: 'Away'
+      to_state: 'Away'
 
 - alias: Mark person location as Extended Away
   initial_state: 'on'
@@ -54,10 +54,10 @@
     for:
       hours: 48
   action:
-  - service: python_script.person_location_update
+  - service: person_location.delayed_state_change
     data_template:
       entity_id: '{{trigger.entity_id}}'
-      change_state_to: 'Extended Away'
+      to_state: 'Extended Away'
 
 #----------------------------------------------------------------------------------------------------------
 # Determine presence from device tracker indicators
@@ -82,7 +82,8 @@
 #      - device_tracker.pams_iphone
 #      - device_tracker.toms_iphone
   action:
-  - service: python_script.person_location_update
+#  - service: python_script.person_location_update
+  - service: person_location.process_trigger
     data_template:
       entity_id: '{{trigger.entity_id}}'
       from_state: '{{trigger.from_state.state}}'
@@ -102,7 +103,8 @@
         {{ trigger.event.data.entity_id.startswith('device_tracker.')
            and trigger.event.data.new_state.state != 'NotSet' }}      
   action:
-    - service: python_script.person_location_update
+#    - service: python_script.person_location_update
+    - service: person_location.process_trigger
       data_template:
         entity_id: '{{trigger.event.data.entity_id}}'
         from_state: '{{trigger.event.data.old_state.state}}'
@@ -117,7 +119,7 @@
 #    entity_id: device_tracker.iphoneyallphone
 #    to: 'home'
 #  action:
-#  - service: python_script.person_location_update
+#  - service: person_location.process_trigger
 #    data_template:
 #      entity_id: '{{trigger.entity_id}}'
 #      from_state: '{{trigger.from_state.state}}'
@@ -134,7 +136,7 @@
 #    for:
 #      seconds: 300
 #  action:
-#  - service: python_script.person_location_update
+#  - service: person_location.process_trigger
 #    data_template:
 #      entity_id: '{{trigger.entity_id}}'
 #      from_state: '{{trigger.from_state.state}}'

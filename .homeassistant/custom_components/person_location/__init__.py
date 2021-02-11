@@ -15,6 +15,7 @@ For details, refer to the docs in https://github.com/rodpayne/home-assistant.
 """
 import json
 import logging
+import string
 import threading
 import time
 import traceback
@@ -68,15 +69,329 @@ def setup(hass, config):
     pli = PERSON_LOCATION_INTEGRATION(API_STATE_OBJECT, hass, config)
     integration_lock = threading.Lock()
 
+    target_lock = threading.Lock()
+    trigger_lock = threading.Lock()
+
+    def call_rest_command_service(personName, newState):
+        """ (Optionally) send HomeSeer a notification of the state change. """
+        rest_command = ""
+        rest_command = (
+            "homeseer_" + personName.lower() + "_" + newState.lower().replace(" ", "_")
+        )
+        try:
+            hass.services.call("rest_command", rest_command)
+        except Exception as e:
+            _LOGGER.debug("rest_command %s exception - %s", rest_command, str(e))
+
+    def handle_delayed_state_change(call):
+        """ Handle the delayed_state_change service. """
+
+        # --------------------------------------------------------------------------------------------------
+        # - For now, this is triggered by one of the following automations:
+        #   "Mark person as Home" after a few minutes with "Just Arrived" --> "Home"
+        #   "Mark person as Away" after a few minutes with "Just Left" --> "Away"
+        #   "Mark person as Extended Away" after 24 hours with "Away" --> "Extended Away"
+        # --------------------------------------------------------------------------------------------------
+
+        entity_id = call.data.get(CONF_ENTITY_ID, "NONE")
+        to_state = call.data.get("to_state", "NONE")
+
+        _LOGGER.debug(
+            "(%s) Start delayed_state_change: to_state = %s" % (entity_id, to_state)
+        )
+
+        with target_lock:
+            """Lock while updating the target(entity_id)."""
+            target = PERSON_LOCATION_ENTITY(entity_id, hass)
+
+            target.state = to_state
+            if to_state == "Home":
+                target.attributes["bread_crumbs"] = to_state  # Reset bread_crumbs
+
+            call_rest_command_service(target.personName, to_state)
+            target.set_state()
+
+    def handle_process_trigger(call):
+        """ Handle the process_trigger service. """
+
+        # --------------------------------------------------------------------------------------------------
+        #   Input:
+        #       - State changes of a device tracker.  Parameters for the call:
+        #           entity_id
+        #           from_state
+        #           to_state
+        #       - Automation.ha_just_started:
+        #           on for a few minutes so that "Just Arrived" and "Just Left" don't get set at startup
+        #   Output (if update is accepted):
+        #       - Updated "sensor.<personName>_location" with <personName>'s location and status:
+        #           Attributes:
+        #           - selected attributes from the triggered device tracker
+        #           - state: "Just Arrived", "Home", "Just Left", "Away", or "Extended Away"
+        #           - person_name: <personName>
+        #           - source: entity_id of the device tracker that triggered the automation
+        #           - reported_state: the state reported by device tracker = "Home", "Away", or <zone>
+        #           - friendly_name: something like "Rod (i.e. Rod's watch) is at Drew's"
+        #           - icon: the icon that correspondes with the current zone
+        #       - Call rest_command service to update HomeSeer: 'homeseer_<personName>_<state>'
+        #   Assumptions:
+        #       - The last device to change zone state is an indicator of where a person is,
+        #           because devices left at home should not change zones.
+        # --------------------------------------------------------------------------------------------------
+
+        entity_id = call.data.get(CONF_ENTITY_ID, "NONE")
+        triggerFrom = call.data.get("from_state", "NONE")
+        triggerTo = call.data.get("to_state", "NONE")
+
+        trigger = PERSON_LOCATION_ENTITY(entity_id, hass)
+
+        # Get more from the triggered device tracker or sensor.
+
+        if "source_type" in trigger.attributes:
+            triggerSourceType = trigger.attributes["source_type"]
+        else:
+            triggerSourceType = "other"
+
+        _LOGGER.debug(
+            "===== triggered entity = %s (%s); From = %s; To = %s",
+            trigger.friendlyName,
+            trigger.name,
+            triggerFrom,
+            triggerTo,
+        )
+
+        # -----------------------------------------------------------------------------
+        # Get the current state of the target person location sensor and
+        # decide if it should be updated with values from the triggered device tracker.
+        saveThisUpdate = False
+        # -----------------------------------------------------------------------------
+
+        with target_lock:
+            """Lock while updating the target(trigger.targetName)."""
+            target = PERSON_LOCATION_ENTITY(trigger.targetName, hass)
+
+        if triggerTo == "NotSet":
+            _LOGGER.debug("Decision: skipping update because triggerTo = %s", triggerTo)
+        elif target.firstTime == True:
+            saveThisUpdate = True
+            _LOGGER.debug(
+                "Decision: target %s does not yet exist (normal at startup)",
+                target.name,
+            )
+            oldTargetState = "none"
+        else:
+            oldTargetState = target.state.lower()
+            if oldTargetState == "unknown":
+                saveThisUpdate = True
+                _LOGGER.debug("Decision: accepting the first update of %s", target.name)
+            elif triggerSourceType == "gps":  # gps device?
+                if triggerTo != triggerFrom:  # did it change zones?
+                    saveThisUpdate = (
+                        True  # gps changing zones is assumed to be new, correct info
+                    )
+                    _LOGGER.debug("Decision: %s has changed zones", trigger.name)
+                else:
+                    if (
+                        not ("source" in target.attributes)
+                        or not ("reported_state" in target.attributes)
+                        or target.attributes["source"] == trigger.name
+                    ):  # same entity as we are following?
+                        saveThisUpdate = True  # same tracker as we are following (or this is the first one)
+                        _LOGGER.debug("Decision: continue following %s", trigger.name)
+                    elif (
+                        trigger.state == target.attributes["reported_state"]
+                    ):  # same status as the one we are following?
+                        if "vertical_accuracy" in trigger.attributes:
+                            if (not ("vertical_accuracy" in target.attributes)) or (
+                                trigger.attributes["vertical_accuracy"] > 0
+                                and target.attributes["vertical_accuracy"] == 0
+                            ):  # better choice based on accuracy?
+                                saveThisUpdate = True
+                                _LOGGER.debug(
+                                    "Decision: vertical_accuracy is better than %s",
+                                    target.attributes["source"],
+                                )
+                        if (
+                            "gps_accuracy" in trigger.attributes
+                            and "gps_accuracy" in target.attributes
+                            and trigger.attributes["gps_accuracy"]
+                            < target.attributes["gps_accuracy"]
+                        ):  # better choice based on accuracy?
+                            saveThisUpdate = True
+                            _LOGGER.debug(
+                                "Decision: gps_accuracy is better than %s",
+                                target.attributes["source"],
+                            )
+            else:  # source = router or ping
+                if triggerTo != triggerFrom:  # did it change state?
+                    if trigger.stateHomeAway == "Home":  # reporting Home
+                        if (
+                            oldTargetState != "home"
+                        ):  # no additional information if already Home
+                            saveThisUpdate = True
+                            _LOGGER.debug(
+                                "Decision: %s has changed state", trigger.name
+                            )
+                    else:  # reporting Away
+                        if (
+                            oldTargetState == "home"
+                        ):  # no additional information if already Away
+                            saveThisUpdate = True
+                            _LOGGER.debug(
+                                "Decision: %s has changed state", trigger.name
+                            )
+
+        # -----------------------------------------------------------------------------
+
+        if saveThisUpdate == False:
+            _LOGGER.debug("Decision: ignore update from %s", trigger.name)
+        else:
+            # Be selective about attributes carried in the target sensor:
+
+            if "source_type" in trigger.attributes:
+                target.attributes["source_type"] = trigger.attributes["source_type"]
+            else:
+                if "source_type" in target.attributes:
+                    target.attributes.pop("source_type")
+
+            if "latitude" in trigger.attributes and "longitude" in trigger.attributes:
+                target.attributes["latitude"] = trigger.attributes["latitude"]
+                target.attributes["longitude"] = trigger.attributes["longitude"]
+            else:
+                if "latitude" in target.attributes:
+                    target.attributes.pop("latitude")
+                if "longitude" in target.attributes:
+                    target.attributes.pop("longitude")
+
+            if "gps_accuracy" in trigger.attributes:
+                target.attributes["gps_accuracy"] = trigger.attributes["gps_accuracy"]
+            else:
+                if "gps_accuracy" in target.attributes:
+                    target.attributes.pop("gps_accuracy")
+
+            if "altitude" in trigger.attributes:
+                target.attributes["altitude"] = round(trigger.attributes["altitude"], 0)
+            else:
+                if "altitude" in target.attributes:
+                    target.attributes.pop("altitude")
+
+            if "vertical_accuracy" in trigger.attributes:
+                target.attributes["vertical_accuracy"] = trigger.attributes[
+                    "vertical_accuracy"
+                ]
+            else:
+                if "vertical_accuracy" in target.attributes:
+                    target.attributes.pop("vertical_accuracy")
+
+            target.attributes["source"] = trigger.name
+            target.attributes["reported_state"] = trigger.state
+            target.attributes["person_name"] = string.capwords(trigger.personName)
+            target.attributes["update_time"] = str(datetime.now())
+
+            # Format new friendly_name and the template to be updated by geocoding.
+
+            if (
+                trigger.state == "Away"
+                or trigger.state == "Stationary"
+                or trigger.state.lower() == "on"
+            ):
+                friendly_name = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is {trigger.state}"
+                template = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is in <locality>"
+            else:
+                friendly_name = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is at {trigger.state}"
+                template = friendly_name
+            target.attributes["friendly_name"] = friendly_name
+
+            # Determine the icon to be used, based on the zone.
+
+            if "zone" in trigger.attributes:
+                zoneEntityID = "zone." + trigger.attributes["zone"]
+            else:
+                zoneEntityID = "zone." + trigger.state.lower().replace(
+                    " ", "_"
+                ).replace("'", "_")
+            zoneStateObject = hass.states.get(zoneEntityID)
+            if zoneStateObject != None:
+                zoneAttributesObject = zoneStateObject.attributes.copy()
+                target.attributes["icon"] = zoneAttributesObject["icon"]
+            else:
+                target.attributes["icon"] = "mdi:help-circle"
+            _LOGGER.debug(
+                "zone = %s; icon = %s", zoneEntityID, target.attributes["icon"]
+            )
+
+            # Set up something like https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/
+            # If Home Assistant just started, just go with Home or Away as the initial state.
+
+            ha_just_startedObject = hass.states.get("automation.ha_just_started")
+            ha_just_started = ha_just_startedObject.state
+            if ha_just_started == "on":
+                _LOGGER.debug("ha_just_started = %s", ha_just_started)
+
+            if trigger.stateHomeAway == "Home":
+                if (
+                    oldTargetState == "none"
+                    or ha_just_started == "on"
+                    or oldTargetState == "just left"
+                ):
+                    newTargetState = "Home"
+                    call_rest_command_service(trigger.personName, newTargetState)
+                elif oldTargetState == "home":
+                    newTargetState = "Home"
+                elif oldTargetState == "just arrived":
+                    newTargetState = "Just Arrived"
+                else:
+                    newTargetState = "Just Arrived"
+                    call_rest_command_service(trigger.personName, newTargetState)
+            else:
+                if oldTargetState == "none" or ha_just_started == "on":
+                    newTargetState = "Away"
+                    call_rest_command_service(trigger.personName, newTargetState)
+                elif oldTargetState == "just left":
+                    newTargetState = "Just Left"
+                elif oldTargetState == "home" or oldTargetState == "just arrived":
+                    newTargetState = "Just Left"
+                    call_rest_command_service(trigger.personName, newTargetState)
+                else:
+                    newTargetState = "Away"
+                    call_rest_command_service(trigger.personName, newTargetState)
+
+            #        _LOGGER.debug(
+            #            "setting sensor name = %s; oldTargetState = %s; newTargetState = %s",
+            #            target.name,
+            #            oldTargetState,
+            #            newTargetState,
+            #        )
+
+            target.state = newTargetState
+
+            #        call_rest_command_service(target.personName, newTargetState)
+            target.set_state()
+
+            # --------------------------------------------------------------------------------------------------
+            # Call service to "reverse geocode" the location:
+            # - determine <locality> for friendly_name
+            # - record full location in OSM_location
+            # - calculate other location-based statistics, such as distance_from_home
+            # For devices at Home, this will only be done initially or on arrival (newTargetState = 'Just Arrived')
+            # --------------------------------------------------------------------------------------------------
+            if newTargetState != "Home" or ha_just_started == "on":
+                service_data = {
+                    "entity_id": target.name,
+                    "friendly_name_template": template,
+                }
+                hass.services.call(
+                    "person_location", "reverse_geocode", service_data, False
+                )
+
     def handle_reverse_geocode(call):
         """ Handle the reverse_geocode service. """
 
         entity_id = call.data.get(CONF_ENTITY_ID, "NONE")
         template = call.data.get(CONF_FRIENDLY_NAME_TEMPLATE, "NONE")
 
-        _LOGGER.debug("(%s) Start %s.reverse_geocode" % (entity_id, DOMAIN))
         _LOGGER.debug(
-            "(%s) %s = %s" % (entity_id, CONF_FRIENDLY_NAME_TEMPLATE, template)
+            "(%s) Start reverse_geocode: %s = %s"
+            % (entity_id, CONF_FRIENDLY_NAME_TEMPLATE, template)
         )
 
         with integration_lock:
@@ -133,9 +448,9 @@ def setup(hass, config):
                     )
 
                     """Handle the service call, updating the target(entity_id)."""
-                    target = PERSON_LOCATION_ENTITY(entity_id, hass)
-                    with target.lock:
+                    with target_lock:
                         """Lock while updating the target(entity_id)."""
+                        target = PERSON_LOCATION_ENTITY(entity_id, hass)
                         attribution = ""
 
                         if ATTR_LATITUDE in target.attributes:
@@ -194,9 +509,11 @@ def setup(hass, config):
                             _LOGGER.debug(
                                 "("
                                 + entity_id
-                                + ") Skipping geocoding because distance_traveled < 10"
+                                + ") Skipping geocoding because distance_traveled < "
+                                + str(MIN_DISTANCE_TRAVELLED)
                             )
                         else:
+                            locality = "?"
 
                             if "update_time" in target.attributes:
                                 new_update_time = datetime.strptime(
@@ -352,10 +669,8 @@ def setup(hass, config):
                                     locality = osm_decoded["address"]["state"]
                                 elif "country" in osm_decoded["address"]:
                                     locality = osm_decoded["address"]["country"]
-                                else:
-                                    locality = "?"
                                 _LOGGER.debug(
-                                    "(" + entity_id + ") locality = " + locality
+                                    "(" + entity_id + ") OSM locality = " + locality
                                 )
 
                                 if "display_name" in osm_decoded:
@@ -363,12 +678,12 @@ def setup(hass, config):
                                 else:
                                     display_name = locality
                                 _LOGGER.debug(
-                                    "(" + entity_id + ") display_name = " + display_name
+                                    "("
+                                    + entity_id
+                                    + ") OSM display_name = "
+                                    + display_name
                                 )
 
-                                target.attributes["friendly_name"] = template.replace(
-                                    "<locality>", locality
-                                )
                                 target.attributes[
                                     "Open_Street_Map"
                                 ] = display_name.replace(", ", " ")
@@ -428,7 +743,7 @@ def setup(hass, config):
                                             _LOGGER.debug(
                                                 "("
                                                 + entity_id
-                                                + ") formatted_address = "
+                                                + ") Google formatted_address = "
                                                 + formatted_address
                                             )
                                             target.attributes[
@@ -437,34 +752,48 @@ def setup(hass, config):
                                         for component in google_decoded["results"][0][
                                             "address_components"
                                         ]:
-                                            _LOGGER.debug(
-                                                "("
-                                                + entity_id
-                                                + ") address_components "
-                                                + str(component["types"])
-                                                + " = "
-                                                + component["long_name"]
-                                            )
+                                            #                    _LOGGER.debug(
+                                            #                        "("
+                                            #                        + entity_id
+                                            #                        + ") address_components "
+                                            #                        + str(component["types"])
+                                            #                        + " = "
+                                            #                        + component["long_name"]
+                                            #                    )
                                             if "locality" in component["types"]:
                                                 locality = component["long_name"]
                                                 _LOGGER.debug(
                                                     "("
                                                     + entity_id
-                                                    + ") locality = "
+                                                    + ") Google locality = "
                                                     + locality
-                                                )
-                                                target.attributes[
-                                                    "friendly_name"
-                                                ] = template.replace(
-                                                    "<locality>", locality
                                                 )
                                         attribution += '"powered by Google"; '
 
+                            target.attributes["friendly_name"] = template.replace(
+                                "<locality>", locality
+                            )
                             target.attributes["location_latitude"] = new_latitude
                             target.attributes["location_longitude"] = new_longitude
                             target.attributes["location_update_time"] = str(
                                 new_update_time
                             )
+
+                            if "reported_state" in target.attributes:
+                                if target.attributes["reported_state"] != "Away":
+                                    newBreadCrumb = target.attributes["reported_state"]
+                                else:
+                                    newBreadCrumb = locality
+                            else:
+                                newBreadCrumb = locality
+                            if "bread_crumbs" in target.attributes:
+                                oldBreadCrumbs = target.attributes["bread_crumbs"]
+                                if not oldBreadCrumbs.endswith(newBreadCrumb):
+                                    target.attributes["bread_crumbs"] = (
+                                        oldBreadCrumbs + "> " + newBreadCrumb
+                                    )
+                            else:
+                                target.attributes["bread_crumbs"] = newBreadCrumb
 
                             """WazeRouteCalculator is checked if not at Home."""
                             if distance_from_home <= 0:
@@ -545,35 +874,36 @@ def setup(hass, config):
                 pli.attributes["api_error_count"] += 1
 
             pli.set_state()
-            _LOGGER.debug("(" + entity_id + ") Finish " + DOMAIN + ".reverse_geocode")
+            _LOGGER.debug("(" + entity_id + ") Finish reverse_geocode")
 
     def handle_geocode_api_on(call):
         """ Handle the geocode_api_on service. """
 
-        _LOGGER.debug("Start " + DOMAIN + ".geocode_api_on")
+        _LOGGER.debug("Start geocode_api_on")
         with integration_lock:
             """Lock while updating the pli(API_STATE_OBJECT)."""
             _LOGGER.debug("Setting " + API_STATE_OBJECT + " on")
             pli.state = "on"
             pli.set_state()
-        _LOGGER.debug("Finish " + DOMAIN + ".geocode_api_on")
+        _LOGGER.debug("Finish geocode_api_on")
 
     def handle_geocode_api_off(call):
         """ Handle the geocode_api_off service. """
 
-        _LOGGER.debug("Start " + DOMAIN + ".geocode_api_off")
+        _LOGGER.debug("Start geocode_api_off")
         with integration_lock:
             """Lock while updating the pli(API_STATE_OBJECT)."""
             _LOGGER.debug("Setting " + API_STATE_OBJECT + " off")
             pli.state = "off"
             pli.set_state()
-        _LOGGER.debug("Finish " + DOMAIN + ".geocode_api_off")
+        _LOGGER.debug("Finish geocode_api_off")
 
     hass.services.register(DOMAIN, "reverse_geocode", handle_reverse_geocode)
     hass.services.register(DOMAIN, "geocode_api_on", handle_geocode_api_on)
     hass.services.register(DOMAIN, "geocode_api_off", handle_geocode_api_off)
+    hass.services.register(DOMAIN, "delayed_state_change", handle_delayed_state_change)
+    hass.services.register(DOMAIN, "process_trigger", handle_process_trigger)
 
-    #    hass.states.set(pli.name, pli.state, pli.attributes)
     pli.set_state()
 
     # Return boolean to indicate that setup was successful.
