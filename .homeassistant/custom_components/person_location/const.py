@@ -17,7 +17,7 @@ from integrationhelper.const import CC_STARTUP_VERSION
 DOMAIN = "person_location"
 INTEGRATION_NAME = "Person Location"
 ISSUE_URL = "https://github.com/rodpayne/home-assistant/issues"
-VERSION = "2021.02.10"
+VERSION = "2021.02.13"
 
 # Fixed Parameters
 MIN_DISTANCE_TRAVELLED = 5
@@ -34,6 +34,18 @@ METERS_PER_MILE = 1609.34
 CONF_LANGUAGE = "language"
 DEFAULT_LANGUAGE = "en"
 
+CONF_HOURS_EXTENDED_AWAY = "extended_away"
+DEFAULT_HOURS_EXTENDED_AWAY = 48
+
+CONF_MINUTES_JUST_ARRIVED = "just_arrived"
+DEFAULT_MINUTES_JUST_ARRIVED = 3
+
+CONF_MINUTES_JUST_LEFT = "just_left"
+DEFAULT_MINUTES_JUST_LEFT = 3
+
+CONF_OUTPUT_PLATFORM = "platform"
+DEFAULT_OUTPUT_PLATFORM = "sensor"
+
 CONF_REGION = "region"
 DEFAULT_REGION = "US"
 
@@ -45,7 +57,19 @@ CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
             {
+                vol.Optional(
+                    CONF_HOURS_EXTENDED_AWAY, default=DEFAULT_HOURS_EXTENDED_AWAY
+                ): cv.string,
+                vol.Optional(
+                    CONF_MINUTES_JUST_ARRIVED, default=DEFAULT_MINUTES_JUST_ARRIVED
+                ): cv.string,
+                vol.Optional(
+                    CONF_MINUTES_JUST_LEFT, default=DEFAULT_MINUTES_JUST_LEFT
+                ): cv.string,
                 vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): cv.string,
+                vol.Optional(
+                    CONF_OUTPUT_PLATFORM, default=DEFAULT_OUTPUT_PLATFORM
+                ): cv.string,
                 vol.Optional(CONF_REGION, default=DEFAULT_REGION): cv.string,
                 vol.Optional(CONF_OSM_API_KEY, default=CONF_API_KEY_NOT_SET): cv.string,
                 vol.Optional(
@@ -61,7 +85,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class PERSON_LOCATION_INTEGRATION:
-    def __init__(self, name, _hass, _config):
+    def __init__(self, entity_id, _hass, _config):
         """ Initialize the integration instance """
         # log startup message
         _LOGGER.info(
@@ -70,11 +94,13 @@ class PERSON_LOCATION_INTEGRATION:
             )
         )
 
-        self.name = name
+        self.entity_id = entity_id
         self.hass = _hass
         self.config = _config
         self.state = "on"
         self.attributes = {}
+        self.attributes["icon"] = "mdi:api"
+
         home_zone = "zone.home"
         self.attributes[ATTR_FRIENDLY_NAME] = f"{INTEGRATION_NAME} Service"
         self.attributes["home_latitude"] = str(
@@ -93,39 +119,65 @@ class PERSON_LOCATION_INTEGRATION:
             ATTR_ATTRIBUTION
         ] = f"System information for the {INTEGRATION_NAME} integration ({DOMAIN}), version {VERSION}."
 
-        self.configured_osm_api_key = self.config[DOMAIN].get(
-            CONF_OSM_API_KEY, CONF_API_KEY_NOT_SET
-        )
         self.configured_google_api_key = self.config[DOMAIN].get(
             CONF_GOOGLE_API_KEY, CONF_API_KEY_NOT_SET
         )
         self.configured_language = self.config[DOMAIN].get(
             CONF_LANGUAGE, DEFAULT_LANGUAGE
         )
+        self.configured_minutes_extended_away = (
+            self.config[DOMAIN].get(
+                CONF_HOURS_EXTENDED_AWAY, DEFAULT_HOURS_EXTENDED_AWAY
+            )
+            * 60
+        )
+        self.configured_minutes_just_arrived = self.config[DOMAIN].get(
+            CONF_MINUTES_JUST_ARRIVED, DEFAULT_MINUTES_JUST_ARRIVED
+        )
+        self.configured_minutes_just_left = self.config[DOMAIN].get(
+            CONF_MINUTES_JUST_LEFT, DEFAULT_MINUTES_JUST_LEFT
+        )
+        self.configured_output_platform = self.config[DOMAIN].get(
+            CONF_OUTPUT_PLATFORM, DEFAULT_OUTPUT_PLATFORM
+        )
+        self.configured_osm_api_key = self.config[DOMAIN].get(
+            CONF_OSM_API_KEY, CONF_API_KEY_NOT_SET
+        )
         self.configured_region = self.config[DOMAIN].get(CONF_REGION, DEFAULT_REGION)
+
+        self.hass.data[DOMAIN] = {
+            "configured_output_platform": self.configured_output_platform,
+        }
 
     def set_state(self):
         _LOGGER.debug(
-            "(%s.set_state) - %s - %s", self.name, self.state, self.attributes
+            "(%s.set_state) - %s - %s", self.entity_id, self.state, self.attributes
         )
-        self.hass.states.set(self.name, self.state, self.attributes.copy())
+        self.hass.states.set(self.entity_id, self.state, self.attributes.copy())
 
 
 class PERSON_LOCATION_ENTITY:
-    def __init__(self, name, _hass):
+    def __init__(self, entity_id, _hass):
         """ Initialize the entity instance """
 
-        self.name = name
+        self.entity_id = entity_id
         self.hass = _hass
 
-        targetStateObject = self.hass.states.get(self.name)
+        targetStateObject = self.hass.states.get(self.entity_id)
         if targetStateObject != None:
             self.firstTime = False
-            self.state = targetStateObject.state
+            if (targetStateObject.state == "stationary") or (
+                targetStateObject.state == "not_home"
+            ):
+                self.state = "Away"
+            else:
+                self.state = targetStateObject.state
+            self.last_changed = targetStateObject.last_changed
             self.attributes = targetStateObject.attributes.copy()
         else:
             self.firstTime = True
             self.state = "Unknown"
+            self.last_changed = datetime.now()
             self.attributes = {}
 
         if "friendly_name" in self.attributes:
@@ -149,18 +201,26 @@ class PERSON_LOCATION_ENTITY:
         elif "owner_fullname" in self.attributes:
             self.personName = self.attributes["owner_fullname"].split()[0].lower()
         else:
-            self.personName = self.name.split(".")[1].split("_")[0].lower()
+            self.personName = self.entity_id.split(".")[1].split("_")[0].lower()
             if self.firstTime == False:
                 _LOGGER.warning(
                     'The account_name (or person_name) attribute is missing in %s, trying "%s"',
-                    self.name,
+                    self.entity_id,
                     self.personName,
                 )
+        # It is tempting to make the output a device_tracker instead of a sensor,
+        # so that it can be input into the Person built-in integration,
+        # but if you do, be very careful not to trigger a loop.
 
-        self.targetName = "sensor." + self.personName.lower() + "_location"
+        configured_output_platform = self.hass.data[DOMAIN][
+            "configured_output_platform"
+        ]
+        self.targetName = (
+            configured_output_platform + "." + self.personName.lower() + "_location"
+        )
 
     def set_state(self):
         _LOGGER.debug(
-            "(%s.set_state) - %s - %s", self.name, self.state, self.attributes
+            "(%s.set_state) - %s - %s", self.entity_id, self.state, self.attributes
         )
-        self.hass.states.set(self.name, self.state, self.attributes.copy())
+        self.hass.states.set(self.entity_id, self.state, self.attributes.copy())

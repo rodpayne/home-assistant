@@ -22,20 +22,6 @@ geocode_api_off:
   # Description of the service
   description: Pause using the Open Street Map API. This may be necessary if a malfunction causes an excessive number of calls or if the external site is unreachable. The Nominatim Usage Policy says, "Apps must make sure that they can switch off the service at our request at any time (in particular, switching should be possible without requiring a software update)." This also pauses the WazeRouteCalculator calls.
 
-delayed_state_change:
-  # Description of the service
-  description: Complete the transition to a new state (from "Just Left", "Just Arrived", etc.)
-  fields:
-    # Key of the field
-    entity_id:
-      # Description of the field
-      description: Name of the entitity be updated
-      # Example value that can be passed for this field
-      example: "sensor.rod_location"
-    to_state:
-      description: The new state to be set ("Away", "Home", "Extended Away").
-      example: "Away"
-
 process_trigger:
   # Description of the service
   description: Process the changes from a device tracker or sensor.
