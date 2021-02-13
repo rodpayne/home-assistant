@@ -3,6 +3,7 @@
   "name": "Person Location",
   "documentation": "https://github.com/rodpayne/home-assistant",
   "dependencies": [
+    "device_tracker",
     "sensor",
     "zone"
   ],
@@ -14,5 +15,5 @@
     "integrationhelper",
     "voluptuous"
   ],
-  "version": "2021.02.10"
+  "version": "2021.02.13"
 }

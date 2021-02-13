@@ -26,14 +26,12 @@
         entity_id: 'sensor.rod_location'
         state: 'Unknown'
         friendly_name: 'Rod (HA restarted)'
-        person_name: 'Rod'
         allow_create: True
     - service: python_script.set_state
       data_template:
         entity_id: 'sensor.pam_location'
         state: 'Unknown'
         friendly_name: 'Pam (HA restarted)'
-        person_name: 'Pam'
         allow_create: True
 # - Update person sensors after iCloud3 device_tracker has been created
     - delay:
@@ -49,6 +47,9 @@
         data:
           type: tts
         message: 'Home Assistant just started.'
+    - service: automation.turn_off
+      data_template:
+        entity_id: 'automation.ha_start'
 
 #----------------------------------------------------------------------------------------------------------
 # The state of 'automation.ha_just_started' can be tested from a script to see if we are initializing.

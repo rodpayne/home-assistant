@@ -25,7 +25,7 @@
 ![Sample person location](images/SamplePersonLocation.png)
 
 ### **Combine the status of multiple device trackers**
-This custom integration will look at all device trackers for a particular person and combine them into a single person location sensor, `sensor.<name>_location`. Device tracker state changes are monitored rather than doing polling, averaging the states, or calculating a probability. 
+This custom integration will look at all device trackers that are for a particular person and combine them into a single person location sensor, `sensor.<name>_location`. These "device trackers" can be `device_tracker`, `sensor`, or `binary_sensor` entities.  Device tracker state changes are monitored rather than doing polling, averaging the states, or calculating a probability. 
 Device trackers follow a device that the person has; the person location sensor tries to follow the person instead.
 
 ### **Make presence detection not so binary**
@@ -43,8 +43,6 @@ The custom integration supplies a service to reverse geocode the location (makin
 ### **File automation_folder/person_location_detection.yaml**
 This automation file contains the example automations that call the person_location/process_trigger service.  These automations determine which device trackers will be watched for events that will trigger processing. 
 
-Automations `Mark person location as Home`, `Mark person location as Away`, and `Mark person location as Extended Away` each need to have the complete list of Person Trackers.  (A future enhancement may find a way to maintain the list automatically.) 
-
 Automation `Person Location Update` contains a list of device tracker entities to be monitored. Automation `Person Location Device Tracker Updated` looks at all `state_changed` events to find the ones that belong to device trackers. One automation or the other (or both) will be needed to select the input to the process.
 
 Note that `Person Location Update for router home` and `Person Location Update for router not_home` are not currently used by me because it drives my router crazy to be probed all the time.  The intention here was to give a five minute delay before declaring the device not home, so that temporary WIFI dropoffs do not cause inappropriate actions.
@@ -61,7 +59,7 @@ In the case of the [Apple iCloud integration](https://www.home-assistant.io/inte
 - platform: icloud
   username: roderickhpayne@gmail.com
   password: !secret icloud_rod
-  account_name: Rod
+  account_name: rod
 ```
 
 ### **Service person_location/process_trigger** 
@@ -161,12 +159,16 @@ person_location:
 
 ### **Configuration Parameters**
 
-| Parameter | Optional | Description |
-| :-------- | :------: | :---------- |
-| `google_api_key` | Yes | Google API Key obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). Default: do not do the Google reverse geocoding.
-| `language`       | Yes | Language parameter for the Google API. Default: `en`
-| `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. Default: do not do the OSM reverse geocoding.
-| `region`         | Yes | Region parameter for the Google API. Default: `US`
+| Parameter | Optional | Description | Default |
+| :-------- | :------: | :---------- | :------ |
+| `extended_away`  | Yes | Number of **hours** before changing `Away` into `Extended Away`. | `48`
+| `google_api_key` | Yes | Google API Key obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). | Do not do the Google reverse geocoding.
+| `just_arrived`   | Yes | Number of **minutes** before changing `Just Arrived` into `Home`. | `3`
+| `just_left`      | Yes | Number of **minutes** before changing `Just Left` into `Away`. | `3`
+| `language`       | Yes | Language parameter for the Google API. | `en`
+| `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. | Do not do the OSM reverse geocoding.
+| `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor`
+| `region`         | Yes | Region parameter for the Google API. | `US`
 
 If you use the iCloud3 integration, the following setting helps with showing the zone and icon when you have an apostrophe in the friendly name.
 ```yaml
