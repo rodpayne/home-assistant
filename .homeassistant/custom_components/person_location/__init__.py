@@ -45,11 +45,12 @@ from requests import get
 
 from .const import (
     API_STATE_OBJECT,
-    CONF_API_KEY_NOT_SET,
     CONF_GOOGLE_API_KEY,
     CONF_LANGUAGE,
+    CONF_MAPQUEST_API_KEY,
     CONF_OSM_API_KEY,
     CONF_REGION,
+    DEFAULT_API_KEY_NOT_SET,
     DEFAULT_LANGUAGE,
     DEFAULT_REGION,
     DOMAIN,
@@ -784,9 +785,12 @@ def setup(hass, config):
                             )
                             target.attributes["direction"] = direction
 
-                            if pli.configured_osm_api_key != CONF_API_KEY_NOT_SET:
+                            if pli.configured_osm_api_key != DEFAULT_API_KEY_NOT_SET:
                                 """Call the Open Street Map (Nominatim) API if osm_api_key is configured"""
-                                if pli.configured_osm_api_key == CONF_API_KEY_NOT_SET:
+                                if (
+                                    pli.configured_osm_api_key
+                                    == DEFAULT_API_KEY_NOT_SET
+                                ):
                                     osm_url = (
                                         "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="
                                         + str(new_latitude)
@@ -851,7 +855,7 @@ def setup(hass, config):
                                 if "licence" in osm_decoded:
                                     attribution += '"' + osm_decoded["licence"] + '"; '
 
-                            if pli.configured_google_api_key != CONF_API_KEY_NOT_SET:
+                            if pli.configured_google_api_key != DEFAULT_API_KEY_NOT_SET:
                                 """Call the Google Maps Reverse Geocoding API if google_api_key is configured"""
                                 """https://developers.google.com/maps/documentation/geocoding/overview?hl=en_US#ReverseGeocoding"""
                                 google_url = (
@@ -932,6 +936,120 @@ def setup(hass, config):
                                                     + locality
                                                 )
                                         attribution += '"powered by Google"; '
+
+                            if (
+                                pli.configured_mapquest_api_key
+                                != DEFAULT_API_KEY_NOT_SET
+                            ):
+                                """Call the Mapquest Reverse Geocoding API if mapquest_api_key is configured"""
+                                """https://developer.mapquest.com/documentation/geocoding-api/reverse/get/"""
+                                mapquest_url = (
+                                    "https://www.mapquestapi.com/geocoding/v1/reverse"
+                                    + "?location="
+                                    + str(new_latitude)
+                                    + ","
+                                    + str(new_longitude)
+                                    + "&thumbMaps=false"
+                                    + "&key="
+                                    + pli.configured_mapquest_api_key
+                                )
+                                mapquest_decoded = {}
+                                #        _LOGGER.debug(
+                                #            "(" + entity_id + ") url - " + mapquest_url
+                                #        )
+                                mapquest_response = get(mapquest_url)
+                                mapquest_json_input = mapquest_response.text
+                                _LOGGER.debug(
+                                    "("
+                                    + entity_id
+                                    + ") response - "
+                                    + mapquest_json_input
+                                )
+                                mapquest_decoded = json.loads(mapquest_json_input)
+
+                                mapquest_statuscode = mapquest_decoded["info"][
+                                    "statuscode"
+                                ]
+                                if mapquest_statuscode != 0:
+                                    _LOGGER.debug(
+                                        "[handle_reverse_geocode]"
+                                        + " ("
+                                        + entity_id
+                                        + ") mapquest_statuscode = "
+                                        + str(mapquest_statuscode)
+                                        + " messages = "
+                                        + mapquest_decoded["info"]["messages"]
+                                    )
+                                else:
+                                    if (
+                                        "results" in mapquest_decoded
+                                        and "locations"
+                                        in mapquest_decoded["results"][0]
+                                    ):
+                                        mapquest_location = mapquest_decoded["results"][
+                                            0
+                                        ]["locations"][0]
+
+                                        formatted_address = ""
+                                        if "street" in mapquest_location:
+                                            formatted_address += (
+                                                mapquest_location["street"] + ", "
+                                            )
+                                        if "adminArea5" in mapquest_location:  # city
+                                            locality = mapquest_location["adminArea5"]
+                                            formatted_address += locality + ", "
+                                        elif (
+                                            "adminArea4" in mapquest_location
+                                            and "adminArea4Type" in mapquest_location
+                                        ):  # county
+                                            locality = (
+                                                mapquest_location["adminArea4"]
+                                                + " "
+                                                + mapquest_location["adminArea4Type"]
+                                            )
+                                            formatted_address += locality + ", "
+                                        if "adminArea3" in mapquest_location:  # state
+                                            formatted_address += (
+                                                mapquest_location["adminArea3"] + " "
+                                            )
+                                        if "postalCode" in mapquest_location:  # zip
+                                            formatted_address += (
+                                                mapquest_location["postalCode"] + " "
+                                            )
+                                        if (
+                                            "adminArea1" in mapquest_location
+                                            and mapquest_location["adminArea1"] != "US"
+                                        ):  # country
+                                            formatted_address += mapquest_location[
+                                                "adminArea1"
+                                            ]
+
+                                        _LOGGER.debug(
+                                            "[handle_reverse_geocode]"
+                                            + " ("
+                                            + entity_id
+                                            + ") mapquest formatted_address = "
+                                            + formatted_address
+                                        )
+                                        target.attributes[
+                                            "MapQuest"
+                                        ] = formatted_address
+
+                                        _LOGGER.debug(
+                                            "[handle_reverse_geocode]"
+                                            + " ("
+                                            + entity_id
+                                            + ") mapquest locality = "
+                                            + locality
+                                        )
+
+                                        attribution += (
+                                            '"'
+                                            + mapquest_decoded["info"]["copyright"][
+                                                "text"
+                                            ]
+                                            + '"; '
+                                        )
 
                             target.attributes["friendly_name"] = template.replace(
                                 "<locality>", locality

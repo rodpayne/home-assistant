@@ -13,12 +13,14 @@
   * [Service person_location/process_trigger](#service-person_locationprocess_trigger)
   * [Folder custom_components/person_location](#folder-custom_componentsperson_location)
     * [Open Street Map Geocoding](#open-street-map-geocoding)
-      * [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
     * [Google Maps Geocoding](#google-maps-geocoding)
-      * [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)
+    * [MapQuest Geocoding](#mapquest-geocoding)
 * [Installation](#installation)   
   * [Manual installation hints](#manual-installation-hints) 
   * [Configuration parameters](#configuration-parameters) 
+      * [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
+      * [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)
+      * [MapQuest Geocoding Configuration](#mapquest-geocoding-configuration)
   * [Lovelace Examples](#lovelace-examples)
   * [Troubleshooting](#troubleshooting)
 * [Back to README](/README.md#home-assistant-configuration)
@@ -37,7 +39,7 @@ When a person is detected as moving between `Home` and `Away`, instead of going 
 *Inspired by <https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/>* 
 
 ### **Reverse geocode the location and make calculations**
-The custom integration supplies a service to reverse geocode the location (making it human readable) using either `Open Street Map` or `Google Maps` and calculate the distance from home (miles and minutes) using `WazeRouteCalculator`.  
+The custom integration supplies a service to reverse geocode the location (making it human readable) using `Open Street Map`, `MapQuest`, or `Google Maps` and calculate the distance from home (miles and minutes) using `WazeRouteCalculator`.  
 
 ## Components
 
@@ -108,44 +110,39 @@ By default, the custom integration will add the following attribute names to the
 *Attribution:* "Data provided by Waze App. Learn more at [Waze.com](https://www.waze.com)"
 
 #### **Open Street Map Geocoding**
-The Open Street Map Geocoding feature adds the following attribute names to the sensor.
+Reverse geocoding generates an address from a latitude and longitude. The Open Street Map reverse geocoding feature adds the following attribute names to the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
-| OSM_location: | 1313 Mockingbird Lane Hollywood Los Angeles California 90038 United States | `display_name` from Open Street Map |
+| Open_Street_Map: | 1313 Mockingbird Lane Hollywood Los Angeles California 90038 United States | `display_name` from Open Street Map |
 | friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
 
-Open Street Map (Nominatim) has [a usage policy](https://operations.osmfoundation.org/policies/nominatim/) that limits the frequency of calls. The custom integration attempts to limit calls to less than once per second, possibly skipping an update until the next one comes along.  To meet the requirement to be able to switch off the service, the state of `person_location.person_location_api` can be changed to `Off`. This can be done by calling service `person_location.geocode_api_off` and then resumed later by calling service `person_location.geocode_api_on`.  The number of calls is also reduced by skipping updates while the person location sensor state is `Home` or if the location has changed by less than 10 meters.  (It will update while the state is `Just Arrived`, so it will reflect the home location while home.)
+Open Street Map (Nominatim) has [a usage policy](https://operations.osmfoundation.org/policies/nominatim/) that limits the frequency of calls. The custom integration attempts to limit calls to less than once per second.  To meet the requirement to be able to switch off the service, the state of `person_location.person_location_api` can be changed to `Off`. This can be done by calling service `person_location.geocode_api_off` and then resumed later by calling service `person_location.geocode_api_on`.  The number of calls is also reduced by skipping updates while the person location sensor state is `Home` or if the location has changed by less than 10 meters.  (It *will* update while the state is `Just Arrived`, so it reflects the home location while home.)
 
 If you find problems with the OSM information, feel free to sign up at https://www.openstreetmap.org/ and edit the map. 
 
 *Attribution:* "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright"
-
-#### **Open Street Map Geocoding Configuration**
-To activate the custom integration with the Open Street Map geocoding feature, add a contact email address to `<config>/configuration.yaml`.
-```yaml
-# Example configuration.yaml entry
-person_location:
-    osm_api_key: !secret gmail_address
-```
 
 #### **Google Maps Geocoding**
 The Google Maps Geocoding feature adds the following attribute names to the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
-| google_location: | 1313 Mockingbird Ln, Los Angeles, CA 90038, USA | `formatted_address` from Google Maps |
+| Google_Maps: | 1313 Mockingbird Ln, Los Angeles, CA 90038, USA | `formatted_address` from Google Maps |
 | friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
 
 *Attribution:* ![powered by Google](images/powered_by_google_on_non_white.png)
 
-#### **Google Maps Geocoding Configuration**
-To activate the custom integration with the Google Maps Geocoding feature, add a Google API Key to `<config>/configuration.yaml`. A Google API Key can be obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). Unfortunately, obtaining a Key requires that billing be set up. Their free tier is generous for our purposes, but if it gives you the heebie-jeebies to give Google a credit card, stick with Open Street Map.
-```yaml
-# Example configuration.yaml entry
-person_location:
-    google_api_key: !secret google_api_key
-```
+#### **MapQuest Geocoding**
+The MapQuest Reverse Geocoding feature adds the following attribute names to the sensor.
+
+| Attribute Name            | Example | Description |
+| :------------------------ | :------ | :---------- |
+| MapQuest: | 1313 Mockingbird Ln, Los Angeles, CA 90038-9436 | constructed from MapQuest location attributes. |
+| friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
+
+*Attribution:* © 2021 MapQuest, Inc.
+
 ## Installation
 ### **Manual Installation Hints**
 1. Copy the components into the appropriate folder under `<config>`.
@@ -167,6 +164,7 @@ person_location:
 | `just_arrived`   | Yes | Number of **minutes** before changing `Just Arrived` into `Home`. | `3`
 | `just_left`      | Yes | Number of **minutes** before changing `Just Left` into `Away`. | `3`
 | `language`       | Yes | Language parameter for the Google API. | `en`
+| `mapquest_api_key`    | Yes | MapQuest API Key obtained from the [MapQuest Developer site](https://developer.mapquest.com/user/me/apps). | Do not do the MapQuest reverse geocoding.
 | `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. | Do not do the OSM reverse geocoding.
 | `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor` as in `sensor.<name>_location`.
 | `region`         | Yes | Region parameter for the Google API. | `US`
@@ -176,6 +174,30 @@ If you use the iCloud3 integration, the following setting helps with showing the
 # config_ic3.yaml
 display_zone_format: fname
 ```
+#### **Open Street Map Geocoding Configuration**
+To activate the custom integration with the Open Street Map reverse geocoding feature, add a contact email address to `<config>/configuration.yaml`.
+```yaml
+# Example configuration.yaml entry
+person_location:
+    osm_api_key: !secret gmail_address
+```
+
+#### **Google Maps Geocoding Configuration**
+To activate the custom integration with the Google Maps Geocoding feature, add a Google API Key to `<config>/configuration.yaml`. A Google API Key can be obtained from the [Google Maps Platform site](https://cloud.google.com/maps-platform#get-started). Unfortunately, obtaining a Key requires that billing be set up. Their free tier is generous for our purposes, but if it gives you the heebie-jeebies to give Google a credit card, stick with Open Street Map.
+```yaml
+# Example configuration.yaml entry
+person_location:
+    google_api_key: !secret google_api_key
+```
+
+#### **MapQuest Geocoding Configuration**
+To activate the custom integration with the MapQuest Reverse Geocode feature, add a MapQuest API Key to `<config>/configuration.yaml`. A MapQuest API Key can be obtained from the [MapQuest Developer site](https://developer.mapquest.com/user/me/apps).
+```yaml
+# Example configuration.yaml entry
+person_location:
+    mapquest_api_key: !secret mapquest_api_key
+```
+
 ### **Lovelace Examples**
 
 Show system information for the Person Location integration (especially during testing).
