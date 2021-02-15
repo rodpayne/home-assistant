@@ -203,7 +203,7 @@ class PERSON_LOCATION_ENTITY:
         else:
             self.personName = self.entity_id.split(".")[1].split("_")[0].lower()
             if self.firstTime == False:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     'The account_name (or person_name) attribute is missing in %s, trying "%s"',
                     self.entity_id,
                     self.personName,

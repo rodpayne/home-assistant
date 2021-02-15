@@ -20,6 +20,7 @@
   * [Manual installation hints](#manual-installation-hints) 
   * [Configuration parameters](#configuration-parameters) 
   * [Lovelace Examples](#lovelace-examples)
+  * [Troubleshooting](#troubleshooting)
 * [Back to README](/README.md#home-assistant-configuration)
 ## Objectives
 ![Sample person location](images/SamplePersonLocation.png)
@@ -167,7 +168,7 @@ person_location:
 | `just_left`      | Yes | Number of **minutes** before changing `Just Left` into `Away`. | `3`
 | `language`       | Yes | Language parameter for the Google API. | `en`
 | `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. | Do not do the OSM reverse geocoding.
-| `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor`
+| `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor` as in `sensor.<name>_location`.
 | `region`         | Yes | Region parameter for the Google API. | `US`
 
 If you use the iCloud3 integration, the following setting helps with showing the zone and icon when you have an apostrophe in the friendly name.
@@ -245,5 +246,14 @@ Show all related device trackers and person location information (especially dur
               - key: sensor.rod_location.friendly_name            
               - key: sensor.rod_location.icon
 # ------------------------------------------------------
+```
+### **Troubleshooting**
+
+To enable detailed logging for this custom integration, add the following to `configuration.yaml`.
+```yaml
+logger:
+  default: warn
+  logs:
+    custom_components.person_location: debug  
 ```
 ### [Back to README](/README.md#home-assistant-configuration)
