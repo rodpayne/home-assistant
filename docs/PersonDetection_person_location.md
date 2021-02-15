@@ -7,20 +7,12 @@
   * [Make presence detection not so binary](#make-presence-detection-not-so-binary)
   * [Reverse geocode the location and make calculations](#reverse-geocode-the-location-and-make-calculations)
 * [Components](#components)
-  * [File automation_folder/person_location_detection](#file-automation_folderperson_location_detectionyaml)
-    * [Device tracker requirements (input)](#device-tracker-requirements-input)
-    * [Person location sensor example (output)](#person-location-sensor-example-output)
-  * [Service person_location/process_trigger](#service-person_locationprocess_trigger)
-  * [Folder custom_components/person_location](#folder-custom_componentsperson_location)
-    * [Open Street Map Geocoding](#open-street-map-geocoding)
-    * [Google Maps Geocoding](#google-maps-geocoding)
-    * [MapQuest Geocoding](#mapquest-geocoding)
+  * [File: automation_folder/person_location_detection.yaml](#file-automation_folderperson_location_detectionyaml)
+  * [Service: person_location/process_trigger](#service-person_locationprocess_trigger)
+  * [Folder: custom_components/person_location](#folder-custom_componentsperson_location)
 * [Installation](#installation)   
   * [Manual installation hints](#manual-installation-hints) 
   * [Configuration parameters](#configuration-parameters) 
-      * [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
-      * [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)
-      * [MapQuest Geocoding Configuration](#mapquest-geocoding-configuration)
   * [Lovelace Examples](#lovelace-examples)
   * [Troubleshooting](#troubleshooting)
 * [Back to README](/README.md#home-assistant-configuration)
@@ -43,14 +35,18 @@ The custom integration supplies a service to reverse geocode the location (makin
 
 ## Components
 
-### **File automation_folder/person_location_detection.yaml**
-This automation file contains the example automations that call the person_location/process_trigger service.  These automations determine which device trackers will be watched for events that will trigger processing. 
+### **File: automation_folder/person_location_detection.yaml**
+This automation file contains the example automations that call the `person_location/process_trigger` service.  These automations determine which device trackers will be watched for events that will trigger processing. 
 
-Automation `Person Location Update` contains a list of device tracker entities to be monitored. Automation `Person Location Device Tracker Updated` looks at all `state_changed` events to find the ones that belong to device trackers. One automation or the other (or both) will be needed to select the input to the process.
+Automation `Person Location Update` contains a list of device tracker entities to be monitored. Automation `Person Location Device Tracker Updated` looks at all `state_changed` events to find the ones that belong to device trackers. One automation or the other (or both) will be needed to select the input for the process.
+<details>
+  <summary> Details</summary>
 
 Note that `Person Location Update for router home` and `Person Location Update for router not_home` are not currently used by me because it drives my router crazy to be probed all the time.  The intention here was to give a five minute delay before declaring the device not home, so that temporary WIFI dropoffs do not cause inappropriate actions.
 
 #### **Device tracker requirements (input)**
+For meaningful results, the device trackers will need to include `latitude` and `longitude` attributes, as in Mobile App, iCloud, and iCloud3 device trackers.  The location features will be skipped for updates triggered by device trackers that do not know the location coordinates.  
+
 Each device tracker that is processed needs to have the identity of the person that is being tracked. This is specified in either a `person_name` or `account_name` attribute of the device tracker. This could be done in Configuration Customizations.
 
 ![Customizations Example](images/CustomizationsExample.png)
@@ -64,10 +60,13 @@ In the case of the [Apple iCloud integration](https://www.home-assistant.io/inte
   password: !secret icloud_rod
   account_name: rod
 ```
+The method used to select device trackers and associate them with a person will likely be enhanced in the future.
+</details>
 
-### **Service person_location/process_trigger** 
+### **Service: person_location/process_trigger** 
 This is the service that is called by automation `Person Location Update` following a state change of a device tracker such as a phone, watch, or car.  It creates/updates a Home Assistant sensor named `sensor.<personName>_location`.
-	
+<details>
+  <summary>Details</summary>	
 The sensor will be updated with a state such as `Just Arrived`, `Home`, `Just Left`, `Away`, or `Extended Away`.  In addition, selected attributes from the triggered device tracker will be copied to the sensor.  Attributes `source` (the triggering entity ID), `reported_state` (the state reported by the device tracker), `icon` (for the current zone), and `friendly_name` (the status of the person) will be updated.
 	
 Note that the person location sensor state is triggered by state changes such as a device changing zones, so a phone left at home does not get a vote for "home".  The assumption is that if the device is moving, then the person has it.  An effort is also made to show more respect to devices with a higher GPS accuracy.
@@ -89,12 +88,20 @@ If you prefer the selection priority that the built-in Person integration provid
 | | | reported_state: | Home | `state` reported by the device tracker |
 | | | update_time: | 2020-12-11 17:08:52.267362 | time that the device tracker was updated |
 | | | icon: | mdi:home | icon for the zone of the location |
+</details>
 
+### **Folder: custom_components/person_location**
+This folder contains the files that make up the Person Location custom integration.
+<details>
+  <summary>Details</summary>
 
-### **Folder custom_components/person_location**
-For meaningful results, the device trackers will need to include `latitude` and `longitude` attributes, as in Mobile App, iCloud, and iCloud3 device trackers.  The location features will be skipped for updates triggered by device trackers that do not know the location coordinates.  
+* [Calculated Location Attributes](#calculated-location-attributes)
+* [Open Street Map Geocoding](#open-street-map-geocoding)
+* [Google Maps Geocoding](#google-maps-geocoding)
+* [MapQuest Geocoding](#mapquest-geocoding)
 
-By default, the custom integration will add the following attribute names to the sensor.
+#### **Calculated Location Attributes**
+By default, the custom integration will update the following attribute names to the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -110,7 +117,7 @@ By default, the custom integration will add the following attribute names to the
 *Attribution:* "Data provided by Waze App. Learn more at [Waze.com](https://www.waze.com)"
 
 #### **Open Street Map Geocoding**
-Reverse geocoding generates an address from a latitude and longitude. The Open Street Map reverse geocoding feature adds the following attribute names to the sensor.
+Reverse geocoding generates an address from a latitude and longitude. The Open Street Map reverse geocoding feature updates the following attribute names to the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -124,7 +131,7 @@ If you find problems with the OSM information, feel free to sign up at https://w
 *Attribution:* "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright"
 
 #### **Google Maps Geocoding**
-The Google Maps Geocoding feature adds the following attribute names to the sensor.
+The Google Maps Geocoding feature updates the following attribute names to the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -142,12 +149,13 @@ The MapQuest Reverse Geocoding feature adds the following attribute names to the
 | friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
 
 *Attribution:* © 2021 MapQuest, Inc.
+</details>
 
 ## Installation
 ### **Manual Installation Hints**
 1. Copy the components into the appropriate folder under `<config>`.
 
-2. Update file `<config>/automation_folder/presence-detection.yaml` as appropriate for your devices.  This file may need to be placed elsewhere or merged into `<config>automation.yaml`, depending on how your configuration is organized. My configuration is split into [multiple folders](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
+2. Update file `<config>/automation_folder/presence-detection.yaml` as appropriate for your devices.  This file may need to be placed elsewhere or merged into `<config>automation.yaml`, depending on how your configuration is organized. My Home Assistant configuration is split into [multiple folders](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
 
 3. Restart Home Assistant.
 
@@ -168,12 +176,14 @@ The MapQuest Reverse Geocoding feature adds the following attribute names to the
 | `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. | Do not do the OSM reverse geocoding.
 | `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor` as in `sensor.<name>_location`.
 | `region`         | Yes | Region parameter for the Google API. | `US`
+<details>
+  <summary>Details</summary>
 
-If you use the iCloud3 integration, the following setting helps with showing the zone and icon when you have an apostrophe in the friendly name.
-```yaml
-# config_ic3.yaml
-display_zone_format: fname
-```
+* [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
+* [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)
+* [MapQuest Geocoding Configuration](#mapquest-geocoding-configuration)
+* [A note about iCloud3](#a-note-about-icloud3)
+
 #### **Open Street Map Geocoding Configuration**
 To activate the custom integration with the Open Street Map reverse geocoding feature, add a contact email address to `<config>/configuration.yaml`.
 ```yaml
@@ -197,6 +207,14 @@ To activate the custom integration with the MapQuest Reverse Geocode feature, ad
 person_location:
     mapquest_api_key: !secret mapquest_api_key
 ```
+
+#### **A note about iCloud3**
+If you use the iCloud3 integration, the following setting helps with showing the zone and icon when you have an apostrophe in the friendly name.
+```yaml
+# config_ic3.yaml
+display_zone_format: fname
+```
+</details>
 
 ### **Lovelace Examples**
 
