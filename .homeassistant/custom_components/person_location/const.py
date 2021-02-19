@@ -17,7 +17,7 @@ from integrationhelper.const import CC_STARTUP_VERSION
 DOMAIN = "person_location"
 INTEGRATION_NAME = "Person Location"
 ISSUE_URL = "https://github.com/rodpayne/home-assistant/issues"
-VERSION = "2021.02.13"
+VERSION = "2021.02.18"
 
 # Fixed Parameters
 MIN_DISTANCE_TRAVELLED = 5
@@ -49,9 +49,10 @@ DEFAULT_OUTPUT_PLATFORM = "sensor"
 CONF_REGION = "region"
 DEFAULT_REGION = "US"
 
-CONF_OSM_API_KEY = "osm_api_key"
 CONF_GOOGLE_API_KEY = "google_api_key"
-CONF_API_KEY_NOT_SET = "no key"
+CONF_MAPQUEST_API_KEY = "mapquest_api_key"
+CONF_OSM_API_KEY = "osm_api_key"
+DEFAULT_API_KEY_NOT_SET = "no key"
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -71,14 +72,19 @@ CONFIG_SCHEMA = vol.Schema(
                     CONF_OUTPUT_PLATFORM, default=DEFAULT_OUTPUT_PLATFORM
                 ): cv.string,
                 vol.Optional(CONF_REGION, default=DEFAULT_REGION): cv.string,
-                vol.Optional(CONF_OSM_API_KEY, default=CONF_API_KEY_NOT_SET): cv.string,
                 vol.Optional(
-                    CONF_GOOGLE_API_KEY, default=CONF_API_KEY_NOT_SET
+                    CONF_MAPQUEST_API_KEY, default=DEFAULT_API_KEY_NOT_SET
+                ): cv.string,
+                vol.Optional(
+                    CONF_OSM_API_KEY, default=DEFAULT_API_KEY_NOT_SET
+                ): cv.string,
+                vol.Optional(
+                    CONF_GOOGLE_API_KEY, default=DEFAULT_API_KEY_NOT_SET
                 ): cv.string,
             }
         ),
     },
-    extra=vol.ALLOW_EXTRA,
+    #    extra=vol.ALLOW_EXTRA,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -120,7 +126,7 @@ class PERSON_LOCATION_INTEGRATION:
         ] = f"System information for the {INTEGRATION_NAME} integration ({DOMAIN}), version {VERSION}."
 
         self.configured_google_api_key = self.config[DOMAIN].get(
-            CONF_GOOGLE_API_KEY, CONF_API_KEY_NOT_SET
+            CONF_GOOGLE_API_KEY, DEFAULT_API_KEY_NOT_SET
         )
         self.configured_language = self.config[DOMAIN].get(
             CONF_LANGUAGE, DEFAULT_LANGUAGE
@@ -140,8 +146,11 @@ class PERSON_LOCATION_INTEGRATION:
         self.configured_output_platform = self.config[DOMAIN].get(
             CONF_OUTPUT_PLATFORM, DEFAULT_OUTPUT_PLATFORM
         )
+        self.configured_mapquest_api_key = self.config[DOMAIN].get(
+            CONF_MAPQUEST_API_KEY, DEFAULT_API_KEY_NOT_SET
+        )
         self.configured_osm_api_key = self.config[DOMAIN].get(
-            CONF_OSM_API_KEY, CONF_API_KEY_NOT_SET
+            CONF_OSM_API_KEY, DEFAULT_API_KEY_NOT_SET
         )
         self.configured_region = self.config[DOMAIN].get(CONF_REGION, DEFAULT_REGION)
 
@@ -203,7 +212,7 @@ class PERSON_LOCATION_ENTITY:
         else:
             self.personName = self.entity_id.split(".")[1].split("_")[0].lower()
             if self.firstTime == False:
-                _LOGGER.warning(
+                _LOGGER.debug(
                     'The account_name (or person_name) attribute is missing in %s, trying "%s"',
                     self.entity_id,
                     self.personName,

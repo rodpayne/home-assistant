@@ -7,19 +7,14 @@
   * [Make presence detection not so binary](#make-presence-detection-not-so-binary)
   * [Reverse geocode the location and make calculations](#reverse-geocode-the-location-and-make-calculations)
 * [Components](#components)
-  * [File automation_folder/person_location_detection](#file-automation_folderperson_location_detectionyaml)
-    * [Device tracker requirements (input)](#device-tracker-requirements-input)
-    * [Person location sensor example (output)](#person-location-sensor-example-output)
-  * [Service person_location/process_trigger](#service-person_locationprocess_trigger)
-  * [Folder custom_components/person_location](#folder-custom_componentsperson_location)
-    * [Open Street Map Geocoding](#open-street-map-geocoding)
-      * [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
-    * [Google Maps Geocoding](#google-maps-geocoding)
-      * [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)
+  * [File: automation_folder/person_location_detection.yaml](#file-automation_folderperson_location_detectionyaml)
+  * [Service: person_location/process_trigger](#service-person_locationprocess_trigger)
+  * [Folder: custom_components/person_location](#folder-custom_componentsperson_location)
 * [Installation](#installation)   
   * [Manual installation hints](#manual-installation-hints) 
   * [Configuration parameters](#configuration-parameters) 
   * [Lovelace Examples](#lovelace-examples)
+  * [Troubleshooting](#troubleshooting)
 * [Back to README](/README.md#home-assistant-configuration)
 ## Objectives
 ![Sample person location](images/SamplePersonLocation.png)
@@ -36,18 +31,22 @@ When a person is detected as moving between `Home` and `Away`, instead of going 
 *Inspired by <https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/>* 
 
 ### **Reverse geocode the location and make calculations**
-The custom integration supplies a service to reverse geocode the location (making it human readable) using either `Open Street Map` or `Google Maps` and calculate the distance from home (miles and minutes) using `WazeRouteCalculator`.  
+The custom integration supplies a service to reverse geocode the location (making it human readable) using `Open Street Map`, `MapQuest`, or `Google Maps` and calculate the distance from home (miles and minutes) using `WazeRouteCalculator`.  
 
 ## Components
 
-### **File automation_folder/person_location_detection.yaml**
-This automation file contains the example automations that call the person_location/process_trigger service.  These automations determine which device trackers will be watched for events that will trigger processing. 
+### **File: automation_folder/person_location_detection.yaml**
+This automation file contains the example automations that call the `person_location/process_trigger` service.  These automations determine which device trackers will be watched for events that will trigger processing. 
 
-Automation `Person Location Update` contains a list of device tracker entities to be monitored. Automation `Person Location Device Tracker Updated` looks at all `state_changed` events to find the ones that belong to device trackers. One automation or the other (or both) will be needed to select the input to the process.
+Automation `Person Location Update` contains a list of device tracker entities to be monitored. Automation `Person Location Device Tracker Updated` looks at all `state_changed` events to find the ones that belong to device trackers. One automation or the other (or both) will be needed to select the input for the process.
+<details>
+  <summary> Details</summary>
 
 Note that `Person Location Update for router home` and `Person Location Update for router not_home` are not currently used by me because it drives my router crazy to be probed all the time.  The intention here was to give a five minute delay before declaring the device not home, so that temporary WIFI dropoffs do not cause inappropriate actions.
 
 #### **Device tracker requirements (input)**
+For meaningful results, the device trackers will need to include `latitude` and `longitude` attributes, as in Mobile App, iCloud, and iCloud3 device trackers.  The location features will be skipped for updates triggered by device trackers that do not know the location coordinates.  
+
 Each device tracker that is processed needs to have the identity of the person that is being tracked. This is specified in either a `person_name` or `account_name` attribute of the device tracker. This could be done in Configuration Customizations.
 
 ![Customizations Example](images/CustomizationsExample.png)
@@ -61,15 +60,18 @@ In the case of the [Apple iCloud integration](https://www.home-assistant.io/inte
   password: !secret icloud_rod
   account_name: rod
 ```
+The method used to select device trackers and associate them with a person will likely be enhanced in the future.
+</details>
 
-### **Service person_location/process_trigger** 
+### **Service: person_location/process_trigger** 
 This is the service that is called by automation `Person Location Update` following a state change of a device tracker such as a phone, watch, or car.  It creates/updates a Home Assistant sensor named `sensor.<personName>_location`.
-	
+<details>
+  <summary>Details</summary>	
 The sensor will be updated with a state such as `Just Arrived`, `Home`, `Just Left`, `Away`, or `Extended Away`.  In addition, selected attributes from the triggered device tracker will be copied to the sensor.  Attributes `source` (the triggering entity ID), `reported_state` (the state reported by the device tracker), `icon` (for the current zone), and `friendly_name` (the status of the person) will be updated.
 	
 Note that the person location sensor state is triggered by state changes such as a device changing zones, so a phone left at home does not get a vote for "home".  The assumption is that if the device is moving, then the person has it.  An effort is also made to show more respect to devices with a higher GPS accuracy.
 
-If you prefer the selection priority that the built-in Person integration provides, only call the person_location service for the `person.<personName>` tracker rather than the upstream device trackers.  Do not mix the two.
+The built-in Person integration competes somewhat in combining the status of multiple device trackers.  I expect that its ability to determine the actual presence and location of a person will improve with time.  If you prefer the selection priority that the built-in Person integration provides, only call the `person_location/process_trigger` service for change of the `person.<personName>` entity rather than the upstream device trackers.  Do not mix the two.
 
 #### **Person location sensor example (output)**
 
@@ -85,13 +87,22 @@ If you prefer the selection priority that the built-in Person integration provid
 | | | source: | device_tracker.crab_apple | device tracker that triggered the state |
 | | | reported_state: | Home | `state` reported by the device tracker |
 | | | update_time: | 2020-12-11 17:08:52.267362 | time that the device tracker was updated |
+| | | zone: | home | zone reported for the location or `away` if not in a zone |
 | | | icon: | mdi:home | icon for the zone of the location |
+</details>
 
+### **Folder: custom_components/person_location**
+This folder contains the files that make up the Person Location custom integration.
+<details>
+  <summary>Details</summary>
 
-### **Folder custom_components/person_location**
-For meaningful results, the device trackers will need to include `latitude` and `longitude` attributes, as in Mobile App, iCloud, and iCloud3 device trackers.  The location features will be skipped for updates triggered by device trackers that do not know the location coordinates.  
+* [Calculated Location Attributes](#calculated-location-attributes)
+* [Open Street Map Geocoding](#open-street-map-geocoding)
+* [Google Maps Geocoding](#google-maps-geocoding)
+* [MapQuest Geocoding](#mapquest-geocoding)
 
-By default, the custom integration will add the following attribute names to the sensor.
+#### **Calculated Location Attributes**
+By default, the custom integration will update the following attribute names to the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -107,49 +118,45 @@ By default, the custom integration will add the following attribute names to the
 *Attribution:* "Data provided by Waze App. Learn more at [Waze.com](https://www.waze.com)"
 
 #### **Open Street Map Geocoding**
-The Open Street Map Geocoding feature adds the following attribute names to the sensor.
+Reverse geocoding generates an address from a latitude and longitude. The Open Street Map reverse geocoding feature updates the following attribute names to the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
-| OSM_location: | 1313 Mockingbird Lane Hollywood Los Angeles California 90038 United States | `display_name` from Open Street Map |
+| Open_Street_Map: | 1313 Mockingbird Lane Hollywood Los Angeles California 90038 United States | `display_name` from Open Street Map |
 | friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
 
-Open Street Map (Nominatim) has [a usage policy](https://operations.osmfoundation.org/policies/nominatim/) that limits the frequency of calls. The custom integration attempts to limit calls to less than once per second, possibly skipping an update until the next one comes along.  To meet the requirement to be able to switch off the service, the state of `person_location.person_location_api` can be changed to `Off`. This can be done by calling service `person_location.geocode_api_off` and then resumed later by calling service `person_location.geocode_api_on`.  The number of calls is also reduced by skipping updates while the person location sensor state is `Home` or if the location has changed by less than 10 meters.  (It will update while the state is `Just Arrived`, so it will reflect the home location while home.)
+Open Street Map (Nominatim) has [a usage policy](https://operations.osmfoundation.org/policies/nominatim/) that limits the frequency of calls. The custom integration attempts to limit calls to less than once per second.  To meet the requirement to be able to switch off the service, the state of `person_location.person_location_api` can be changed to `Off`. This can be done by calling service `person_location.geocode_api_off` and then resumed later by calling service `person_location.geocode_api_on`.  The number of calls is also reduced by skipping updates while the person location sensor state is `Home` or if the location has changed by less than 10 meters.  (It *will* update while the state is `Just Arrived`, so it reflects the home location while home.)
 
 If you find problems with the OSM information, feel free to sign up at https://www.openstreetmap.org/ and edit the map. 
 
 *Attribution:* "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright"
 
-#### **Open Street Map Geocoding Configuration**
-To activate the custom integration with the Open Street Map geocoding feature, add a contact email address to `<config>/configuration.yaml`.
-```yaml
-# Example configuration.yaml entry
-person_location:
-    osm_api_key: !secret gmail_address
-```
-
 #### **Google Maps Geocoding**
-The Google Maps Geocoding feature adds the following attribute names to the sensor.
+The Google Maps Geocoding feature updates the following attribute names to the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
-| google_location: | 1313 Mockingbird Ln, Los Angeles, CA 90038, USA | `formatted_address` from Google Maps |
+| Google_Maps: | 1313 Mockingbird Ln, Los Angeles, CA 90038, USA | `formatted_address` from Google Maps |
 | friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
 
 *Attribution:* ![powered by Google](images/powered_by_google_on_non_white.png)
 
-#### **Google Maps Geocoding Configuration**
-To activate the custom integration with the Google Maps Geocoding feature, add a Google API Key to `<config>/configuration.yaml`. A Google API Key can be obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). Unfortunately, obtaining a Key requires that billing be set up. Their free tier is generous for our purposes, but if it gives you the heebie-jeebies to give Google a credit card, stick with Open Street Map.
-```yaml
-# Example configuration.yaml entry
-person_location:
-    google_api_key: !secret google_api_key
-```
+#### **MapQuest Geocoding**
+The MapQuest Reverse Geocoding feature adds the following attribute names to the sensor.
+
+| Attribute Name            | Example | Description |
+| :------------------------ | :------ | :---------- |
+| MapQuest: | 1313 Mockingbird Ln, Los Angeles, CA 90038-9436 | constructed from MapQuest location attributes. |
+| friendly_name: | Rod (Rod's iPhone) is in Los Angeles | formatted location to be displayed for sensor |
+
+*Attribution:* © 2021 MapQuest, Inc.
+</details>
+
 ## Installation
 ### **Manual Installation Hints**
 1. Copy the components into the appropriate folder under `<config>`.
 
-2. Update file `<config>/automation_folder/presence-detection.yaml` as appropriate for your devices.  This file may need to be placed elsewhere or merged into `<config>automation.yaml`, depending on how your configuration is organized. My configuration is split into [multiple folders](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
+2. Update file `<config>/automation_folder/presence-detection.yaml` as appropriate for your devices.  This file may need to be placed elsewhere or merged into `<config>automation.yaml`, depending on how your configuration is organized. My Home Assistant configuration is split into [multiple folders](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
 
 3. Restart Home Assistant.
 
@@ -166,15 +173,50 @@ person_location:
 | `just_arrived`   | Yes | Number of **minutes** before changing `Just Arrived` into `Home`. | `3`
 | `just_left`      | Yes | Number of **minutes** before changing `Just Left` into `Away`. | `3`
 | `language`       | Yes | Language parameter for the Google API. | `en`
+| `mapquest_api_key`    | Yes | MapQuest API Key obtained from the [MapQuest Developer site](https://developer.mapquest.com/user/me/apps). | Do not do the MapQuest reverse geocoding.
 | `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. | Do not do the OSM reverse geocoding.
-| `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor`
+| `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor` as in `sensor.<name>_location`.
 | `region`         | Yes | Region parameter for the Google API. | `US`
+<details>
+  <summary>Details</summary>
 
+* [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
+* [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)
+* [MapQuest Geocoding Configuration](#mapquest-geocoding-configuration)
+* [A note about iCloud3](#a-note-about-icloud3)
+
+#### **Open Street Map Geocoding Configuration**
+To activate the custom integration with the Open Street Map reverse geocoding feature, add a contact email address to `<config>/configuration.yaml`.
+```yaml
+# Example configuration.yaml entry
+person_location:
+    osm_api_key: !secret gmail_address
+```
+
+#### **Google Maps Geocoding Configuration**
+To activate the custom integration with the Google Maps Geocoding feature, add a Google API Key to `<config>/configuration.yaml`. A Google API Key can be obtained from the [Google Maps Platform site](https://cloud.google.com/maps-platform#get-started). Unfortunately, obtaining a Key requires that billing be set up. Their free tier is generous for our purposes, but if it gives you the heebie-jeebies to give Google a credit card, stick with Open Street Map.
+```yaml
+# Example configuration.yaml entry
+person_location:
+    google_api_key: !secret google_api_key
+```
+
+#### **MapQuest Geocoding Configuration**
+To activate the custom integration with the MapQuest Reverse Geocode feature, add a MapQuest API Key to `<config>/configuration.yaml`. A MapQuest API Key can be obtained from the [MapQuest Developer site](https://developer.mapquest.com/user/me/apps).
+```yaml
+# Example configuration.yaml entry
+person_location:
+    mapquest_api_key: !secret mapquest_api_key
+```
+
+#### **A note about iCloud3**
 If you use the iCloud3 integration, the following setting helps with showing the zone and icon when you have an apostrophe in the friendly name.
 ```yaml
 # config_ic3.yaml
 display_zone_format: fname
 ```
+</details>
+
 ### **Lovelace Examples**
 
 Show system information for the Person Location integration (especially during testing).
@@ -245,5 +287,14 @@ Show all related device trackers and person location information (especially dur
               - key: sensor.rod_location.friendly_name            
               - key: sensor.rod_location.icon
 # ------------------------------------------------------
+```
+### **Troubleshooting**
+
+To enable detailed logging for this custom integration, add the following to `configuration.yaml`.
+```yaml
+logger:
+  default: warn
+  logs:
+    custom_components.person_location: debug  
 ```
 ### [Back to README](/README.md#home-assistant-configuration)
