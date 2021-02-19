@@ -71,7 +71,7 @@ The sensor will be updated with a state such as `Just Arrived`, `Home`, `Just Le
 	
 Note that the person location sensor state is triggered by state changes such as a device changing zones, so a phone left at home does not get a vote for "home".  The assumption is that if the device is moving, then the person has it.  An effort is also made to show more respect to devices with a higher GPS accuracy.
 
-If you prefer the selection priority that the built-in Person integration provides, only call the person_location service for the `person.<personName>` tracker rather than the upstream device trackers.  Do not mix the two.
+The built-in Person integration competes somewhat in combining the status of multiple device trackers.  I expect that its ability to determine the actual presence and location of a person will improve with time.  If you prefer the selection priority that the built-in Person integration provides, only call the `person_location/process_trigger` service for change of the `person.<personName>` entity rather than the upstream device trackers.  Do not mix the two.
 
 #### **Person location sensor example (output)**
 
@@ -87,6 +87,7 @@ If you prefer the selection priority that the built-in Person integration provid
 | | | source: | device_tracker.crab_apple | device tracker that triggered the state |
 | | | reported_state: | Home | `state` reported by the device tracker |
 | | | update_time: | 2020-12-11 17:08:52.267362 | time that the device tracker was updated |
+| | | zone: | home | zone reported for the location or `away` if not in a zone |
 | | | icon: | mdi:home | icon for the zone of the location |
 </details>
 

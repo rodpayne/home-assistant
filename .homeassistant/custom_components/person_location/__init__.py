@@ -305,7 +305,7 @@ def setup(hass, config):
                                         target.attributes["source"],
                                     )
                     else:  # source = router or ping
-                        if triggerTo != triggerFrom:  # did it change state?
+                        if triggerTo != triggerFrom:  # did tracker change state?
                             if trigger.stateHomeAway == "Home":  # reporting Home
                                 if (
                                     oldTargetState != "home"
@@ -398,23 +398,30 @@ def setup(hass, config):
                         template = friendly_name
                     target.attributes["friendly_name"] = friendly_name
 
-                    # Determine the icon to be used, based on the zone.
+                    # Determine the zone and the icon to be used, based on the zone.
 
                     if "zone" in trigger.attributes:
-                        zoneEntityID = "zone." + trigger.attributes["zone"]
+                        reportedZone = trigger.attributes["zone"]
                     else:
-                        zoneEntityID = "zone." + trigger.state.lower().replace(
-                            " ", "_"
-                        ).replace("'", "_")
+                        reportedZone = (
+                            trigger.state.lower().replace(" ", "_").replace("'", "_")
+                        )
+                    zoneEntityID = "zone." + reportedZone
                     zoneStateObject = hass.states.get(zoneEntityID)
                     if zoneStateObject != None:
                         zoneAttributesObject = zoneStateObject.attributes.copy()
-                        target.attributes["icon"] = zoneAttributesObject["icon"]
+                        icon = zoneAttributesObject["icon"]
                     else:
-                        target.attributes["icon"] = "mdi:help-circle"
+                        icon = "mdi:help-circle"
+                        if reportedZone != "home":  # (zone.home may not be defined)
+                            reportedZone = (
+                                trigger.stateHomeAway.lower()
+                            )  # clean up the odd "zones"
+                    target.attributes["icon"] = icon
+                    target.attributes["zone"] = reportedZone
                     _LOGGER.debug(
                         "[handle_process_trigger]" + " zone = %s; icon = %s",
-                        zoneEntityID,
+                        reportedZone,
                         target.attributes["icon"],
                     )
 
