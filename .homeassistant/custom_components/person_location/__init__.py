@@ -398,7 +398,7 @@ def setup(hass, config):
                         template = friendly_name
                     target.attributes["friendly_name"] = friendly_name
 
-                    # Determine the zone and the icon to be used, based on the zone.
+                    # Determine the zone and the icon to be used based on the zone.
 
                     if "zone" in trigger.attributes:
                         reportedZone = trigger.attributes["zone"]

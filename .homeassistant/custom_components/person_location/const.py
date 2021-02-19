@@ -17,7 +17,7 @@ from integrationhelper.const import CC_STARTUP_VERSION
 DOMAIN = "person_location"
 INTEGRATION_NAME = "Person Location"
 ISSUE_URL = "https://github.com/rodpayne/home-assistant/issues"
-VERSION = "2021.02.13"
+VERSION = "2021.02.18"
 
 # Fixed Parameters
 MIN_DISTANCE_TRAVELLED = 5
