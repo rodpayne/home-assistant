@@ -21,7 +21,7 @@
 
 ### **Combine the status of multiple device trackers**
 This custom integration will look at all device trackers that are for a particular person and combine them into a single person location sensor, `sensor.<name>_location`. These "device trackers" can be `device_tracker`, `sensor`, or `binary_sensor` entities.  Device tracker state changes are monitored rather than doing polling, averaging the states, or calculating a probability. 
-Device trackers follow a device that the person has; the person location sensor tries to follow the person instead.
+Device trackers follow devices that the person has; the person location sensor tries to follow the person instead.
 
 ### **Make presence detection not so binary**
 When a person is detected as moving between `Home` and `Away`, instead of going straight to `Home` or `Away`, it will temporarily change the person's status to `Just Arrived` or `Just Left` so that automations can be triggered or conditions applied appropriately.
@@ -40,7 +40,7 @@ This automation file contains the example automations that call the `person_loca
 
 Automation `Person Location Update` contains a list of device tracker entities to be monitored. Automation `Person Location Device Tracker Updated` looks at all `state_changed` events to find the ones that belong to device trackers. One automation or the other (or both) will be needed to select the input for the process.
 <details>
-  <summary> Details</summary>
+  <summary> More Details</summary>
 
 Note that `Person Location Update for router home` and `Person Location Update for router not_home` are not currently used by me because it drives my router crazy to be probed all the time.  The intention here was to give a five minute delay before declaring the device not home, so that temporary WIFI dropoffs do not cause inappropriate actions.
 
@@ -66,12 +66,12 @@ The method used to select device trackers and associate them with a person will 
 ### **Service: person_location/process_trigger** 
 This is the service that is called by automation `Person Location Update` following a state change of a device tracker such as a phone, watch, or car.  It creates/updates a Home Assistant sensor named `sensor.<personName>_location`.
 <details>
-  <summary>Details</summary>	
+  <summary>More Details</summary>	
 The sensor will be updated with a state such as `Just Arrived`, `Home`, `Just Left`, `Away`, or `Extended Away`.  In addition, selected attributes from the triggered device tracker will be copied to the sensor.  Attributes `source` (the triggering entity ID), `reported_state` (the state reported by the device tracker), `icon` (for the current zone), and `friendly_name` (the status of the person) will be updated.
 	
 Note that the person location sensor state is triggered by state changes such as a device changing zones, so a phone left at home does not get a vote for "home".  The assumption is that if the device is moving, then the person has it.  An effort is also made to show more respect to devices with a higher GPS accuracy.
 
-The built-in Person integration competes somewhat in combining the status of multiple device trackers.  I expect that its ability to determine the actual presence and location of a person will improve with time.  If you prefer the selection priority that the built-in Person integration provides, only call the `person_location/process_trigger` service for change of the `person.<personName>` entity rather than the upstream device trackers.  Do not mix the two.
+The built-in Person integration competes somewhat in combining the status of multiple device trackers.  I expect that its ability to determine the actual presence and location of a person will improve with time.  If you prefer the selection priority that the built-in Person integration provides, only call the `person_location/process_trigger` service for changes of the `person.<personName>` entity rather than the upstream device trackers.  Do not mix the two.
 
 #### **Person location sensor example (output)**
 
@@ -94,7 +94,7 @@ The built-in Person integration competes somewhat in combining the status of mul
 ### **Folder: custom_components/person_location**
 This folder contains the files that make up the Person Location custom integration.
 <details>
-  <summary>Details</summary>
+  <summary>More Details</summary>
 
 * [Calculated Location Attributes](#calculated-location-attributes)
 * [Open Street Map Geocoding](#open-street-map-geocoding)
@@ -154,7 +154,7 @@ The MapQuest Reverse Geocoding feature adds the following attribute names to the
 
 ## Installation
 ### **Manual Installation Hints**
-1. Copy the components into the appropriate folder under `<config>`.
+1. Copy the components into the appropriate folders under `<config>`.
 
 2. Update file `<config>/automation_folder/presence-detection.yaml` as appropriate for your devices.  This file may need to be placed elsewhere or merged into `<config>automation.yaml`, depending on how your configuration is organized. My Home Assistant configuration is split into [multiple folders](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
 
@@ -178,7 +178,7 @@ The MapQuest Reverse Geocoding feature adds the following attribute names to the
 | `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor` as in `sensor.<name>_location`.
 | `region`         | Yes | Region parameter for the Google API. | `US`
 <details>
-  <summary>Details</summary>
+  <summary>More Details</summary>
 
 * [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
 * [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)
