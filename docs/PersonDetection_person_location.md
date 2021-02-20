@@ -9,6 +9,7 @@
 * [Components](#components)
   * [File: automation_folder/person_location_detection.yaml](#file-automation_folderperson_location_detectionyaml)
   * [Service: person_location/process_trigger](#service-person_locationprocess_trigger)
+  * [Service: person_location/reverse_geocode](#service-person_locationreverse_geocode)
   * [Folder: custom_components/person_location](#folder-custom_componentsperson_location)
 * [Installation](#installation)   
   * [Manual installation hints](#manual-installation-hints) 
@@ -67,6 +68,26 @@ The method used to select device trackers and associate them with a person will 
 This is the service that is called by automation `Person Location Update` following a state change of a device tracker such as a phone, watch, or car.  It creates/updates a Home Assistant sensor named `sensor.<personName>_location`.
 <details>
   <summary>More Details</summary>	
+
+```yaml	
+Input:
+  - Parameters for the call:
+      entity_id
+      from_state
+      to_state
+  - Automation.ha_just_started:
+      on for a few minutes so that "Just Arrived" and "Just Left" don't get set at startup
+  - Attributes of entity_id (supplied by device_tracker process):
+      latitude
+      longitude
+      person_name (if different from what is implied by entity_id = device_tracker.<person_name>_whatever)
+      altitude (optional, passed thru to output sensor)
+      gps_accuracy (optional)
+      source_type (optional)
+      update_time (optional)
+      vertical_accuracy (optional)
+      zone (optional)
+```
 The sensor will be updated with a state such as `Just Arrived`, `Home`, `Just Left`, `Away`, or `Extended Away`.  In addition, selected attributes from the triggered device tracker will be copied to the sensor.  Attributes `source` (the triggering entity ID), `reported_state` (the state reported by the device tracker), `icon` (for the current zone), and `friendly_name` (the status of the person) will be updated.
 	
 Note that the person location sensor state is triggered by state changes such as a device changing zones, so a phone left at home does not get a vote for "home".  The assumption is that if the device is moving, then the person has it.  An effort is also made to show more respect to devices with a higher GPS accuracy.
@@ -89,6 +110,28 @@ The built-in Person integration competes somewhat in combining the status of mul
 | | | update_time: | 2020-12-11 17:08:52.267362 | time that the device tracker was updated |
 | | | zone: | home | zone reported for the location or `away` if not in a zone |
 | | | icon: | mdi:home | icon for the zone of the location |
+</details>
+
+### **Service: person_location/reverse_geocode** 
+This is the service to reverse geocode the location in a sensor and it is called by `person_location/process_trigger`.  It could also be called by other integrations to do the same for their sensors. 
+<details>
+  <summary>More Details</summary>
+
+```yaml	
+Input:
+  - Parameters for the call:
+      entity_id
+      friendly_name_template (optional)
+  - Attributes of entity_id:
+      - attributes supplied by another process (to provide current location):
+          latitude
+          longitude
+          update_time (optional)
+      - attributes updated in the previous call (to provide deltas):
+          location_latitude
+          location_longitude
+          location_update_time     
+```
 </details>
 
 ### **Folder: custom_components/person_location**

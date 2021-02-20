@@ -28,6 +28,8 @@ from homeassistant.helpers.event import (
 )
 import requests
 import voluptuous as vol
+import WazeRouteCalculator
+
 from homeassistant.components.device_tracker.const import (
     ATTR_SOURCE_TYPE,
     SOURCE_TYPE_GPS,
@@ -63,6 +65,7 @@ from .const import (
     PERSON_LOCATION_INTEGRATION,
     THROTTLE_INTERVAL,
     VERSION,
+    WAZE_MIN_METERS_FROM_HOME,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -172,7 +175,7 @@ def setup(hass, config):
 
         # --------------------------------------------------------------------------------------------------
         #   Input:
-        #       - State changes of a device tracker.  Parameters for the call:
+        #       - Parameters for the call:
         #           entity_id
         #           from_state
         #           to_state
@@ -197,6 +200,15 @@ def setup(hass, config):
         entity_id = call.data.get(CONF_ENTITY_ID, "NONE")
         triggerFrom = call.data.get("from_state", "NONE")
         triggerTo = call.data.get("to_state", "NONE")
+
+        if entity_id == "NONE":
+            {
+                _LOGGER.warning(
+                    "%s is required in call of %s.process_trigger service."
+                    % (CONF_ENTITY_ID, DOMAIN)
+                )
+                # return False
+            }
 
         trigger = PERSON_LOCATION_ENTITY(entity_id, hass)
 
@@ -425,6 +437,12 @@ def setup(hass, config):
                         target.attributes["icon"],
                     )
 
+                    if reportedZone == "home":
+                        target.attributes["latitude"] = pli.attributes["home_latitude"]
+                        target.attributes["longitude"] = pli.attributes[
+                            "home_longitude"
+                        ]
+
                     # Set up something like https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/
                     # If Home Assistant just started, just go with Home or Away as the initial state.
 
@@ -498,13 +516,14 @@ def setup(hass, config):
                             )
 
                     target.state = newTargetState
+                    target.attributes["version"] = f"{DOMAIN} {VERSION}"
 
                     target.set_state()
 
                     # --------------------------------------------------------------------------------------------------
                     # Call service to "reverse geocode" the location:
                     # - determine <locality> for friendly_name
-                    # - record full location in OSM_location
+                    # - record full location in Google_Maps, MapQuest, and/or Open_Street_Map
                     # - calculate other location-based statistics, such as distance_from_home
                     # For devices at Home, this will only be done initially or on arrival (newTargetState = 'Just Arrived')
                     # --------------------------------------------------------------------------------------------------
@@ -526,8 +545,33 @@ def setup(hass, config):
     def handle_reverse_geocode(call):
         """ Handle the reverse_geocode service. """
 
+        # --------------------------------------------------------------------------------------------------
+        #   Input:
+        #       - Parameters for the call:
+        #           entity_id
+        #           friendly_name_template (optional)
+        #       - Attributes of entity_id:
+        #         - attributes supplied by another process (to provide current location):
+        #           - latitude
+        #           - longitude
+        #           - update_time (optional)
+        #         - attributes updated in the previous call (to provide deltas):
+        #           - location_latitude
+        #           - location_longitude
+        #           - location_update_time
+        # --------------------------------------------------------------------------------------------------
+
         entity_id = call.data.get(CONF_ENTITY_ID, "NONE")
         template = call.data.get(CONF_FRIENDLY_NAME_TEMPLATE, "NONE")
+
+        if entity_id == "NONE":
+            {
+                _LOGGER.warning(
+                    "%s is required in call of %s.reverse_geocode service."
+                    % (CONF_ENTITY_ID, DOMAIN)
+                )
+                # return False
+            }
 
         _LOGGER.debug(
             "[handle_reverse_geocode]"
@@ -636,6 +680,23 @@ def setup(hass, config):
                                 ),
                                 3,
                             )
+
+                            if (
+                                pli.attributes["home_latitude"] != "None"
+                                and pli.attributes["home_longitude"] != "None"
+                            ):
+                                old_distance_from_home = round(
+                                    distance(
+                                        float(old_latitude),
+                                        float(old_longitude),
+                                        float(pli.attributes["home_latitude"]),
+                                        float(pli.attributes["home_longitude"]),
+                                    ),
+                                    3,
+                                )
+                            else:
+                                old_distance_from_home = 0
+
                             _LOGGER.debug(
                                 "[handle_reverse_geocode]"
                                 + " ("
@@ -645,6 +706,7 @@ def setup(hass, config):
                             )
                         else:
                             distance_traveled = 0
+                            old_distance_from_home = 0
 
                         if new_latitude == "None" or new_longitude == "None":
                             _LOGGER.debug(
@@ -729,12 +791,6 @@ def setup(hass, config):
                                 )
                             else:
                                 speed_during_interval = 0
-
-                            old_distance_from_home = 0
-                            if "meters_from_home" in target.attributes:
-                                old_distance_from_home = float(
-                                    target.attributes["meters_from_home"]
-                                )
 
                             if (
                                 "reported_state" in target.attributes
@@ -869,7 +925,7 @@ def setup(hass, config):
                                     "https://maps.googleapis.com/maps/api/geocode/json?language="
                                     + pli.configured_language
                                     + "&region="
-                                    + pli.configured_region
+                                    + pli.configured_google_region
                                     + "&latlng="
                                     + str(new_latitude)
                                     + ","
@@ -1057,10 +1113,10 @@ def setup(hass, config):
                                             ]
                                             + '"; '
                                         )
-
-                            target.attributes["friendly_name"] = template.replace(
-                                "<locality>", locality
-                            )
+                            if template != "NONE":
+                                target.attributes["friendly_name"] = template.replace(
+                                    "<locality>", locality
+                                )
                             target.attributes["location_latitude"] = new_latitude
                             target.attributes["location_longitude"] = new_longitude
                             target.attributes["location_update_time"] = str(
@@ -1084,33 +1140,40 @@ def setup(hass, config):
                                 target.attributes["bread_crumbs"] = newBreadCrumb
 
                             """WazeRouteCalculator is checked if not at Home."""
-                            if distance_from_home <= 0:
-                                routeTime = 0
-                                routeDistance = 0
+                            if pli.use_waze == False:
+                                pass
+                            elif (
+                                int(target.attributes["meters_from_home"])
+                                < WAZE_MIN_METERS_FROM_HOME
+                            ):
                                 target.attributes["driving_miles"] = "0"
                                 target.attributes["driving_minutes"] = "0"
                             else:
                                 try:
+                                    """
+                                    Figure it out from:
+                                    https://github.com/home-assistant/core/blob/dev/homeassistant/components/waze_travel_time/sensor.py
+                                    https://github.com/kovacsbalu/WazeRouteCalculator
+                                    """
                                     _LOGGER.debug(
                                         "[handle_reverse_geocode]"
                                         + " (("
                                         + entity_id
                                         + ") Waze calculation"
                                     )
-                                    import WazeRouteCalculator
 
-                                    from_address = (
+                                    from_location = (
                                         str(new_latitude) + "," + str(new_longitude)
                                     )
-                                    to_address = (
+                                    to_location = (
                                         str(pli.attributes["home_latitude"])
                                         + ","
                                         + str(pli.attributes["home_longitude"])
                                     )
                                     route = WazeRouteCalculator.WazeRouteCalculator(
-                                        from_address,
-                                        to_address,
-                                        pli.configured_region,
+                                        from_location,
+                                        to_location,
+                                        pli.configured_waze_region,
                                         avoid_toll_roads=True,
                                     )
                                     routeTime, routeDistance = route.calc_route_info()

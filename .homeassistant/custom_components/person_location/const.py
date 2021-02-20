@@ -12,18 +12,20 @@ from homeassistant.const import (
     ATTR_LONGITUDE,
 )
 from integrationhelper.const import CC_STARTUP_VERSION
+from homeassistant.components.waze_travel_time.sensor import REGIONS as WAZE_REGIONS
 
 # Our info
 DOMAIN = "person_location"
 INTEGRATION_NAME = "Person Location"
 ISSUE_URL = "https://github.com/rodpayne/home-assistant/issues"
-VERSION = "2021.02.18"
+VERSION = "2021.02.20"
 
 # Fixed Parameters
 MIN_DISTANCE_TRAVELLED = 5
 THROTTLE_INTERVAL = timedelta(
     seconds=1
 )  # See https://operations.osmfoundation.org/policies/nominatim/ regarding throttling.
+WAZE_MIN_METERS_FROM_HOME = 500
 
 # Constants
 API_STATE_OBJECT = DOMAIN + "." + DOMAIN + "_api"
@@ -152,7 +154,18 @@ class PERSON_LOCATION_INTEGRATION:
         self.configured_osm_api_key = self.config[DOMAIN].get(
             CONF_OSM_API_KEY, DEFAULT_API_KEY_NOT_SET
         )
-        self.configured_region = self.config[DOMAIN].get(CONF_REGION, DEFAULT_REGION)
+        # may need to split these up later:
+        self.configured_google_region = self.config[DOMAIN].get(
+            CONF_REGION, DEFAULT_REGION
+        )
+        self.configured_waze_region = self.config[DOMAIN].get(
+            CONF_REGION, DEFAULT_REGION
+        )
+        if self.configured_waze_region in WAZE_REGIONS:
+            self.use_waze = True
+        else:
+            self.use_waze = False
+            _LOGGER.error("Configured Waze region is not valid")
 
         self.hass.data[DOMAIN] = {
             "configured_output_platform": self.configured_output_platform,
