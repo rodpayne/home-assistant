@@ -169,13 +169,18 @@ class PERSON_LOCATION_INTEGRATION:
 
         self.hass.data[DOMAIN] = {
             "configured_output_platform": self.configured_output_platform,
+            "sensor_info": {},
         }
 
     def set_state(self):
         _LOGGER.debug(
-            "(%s.set_state) - %s - %s", self.entity_id, self.state, self.attributes
+            "(%s.set_state) -state: %s -attributes: %s -data: %s",
+            self.entity_id,
+            self.state,
+            self.attributes,
+            self.hass.data[DOMAIN],
         )
-        self.hass.states.set(self.entity_id, self.state, self.attributes.copy())
+        self.hass.states.set(self.entity_id, self.state, self.attributes)
 
 
 class PERSON_LOCATION_ENTITY:
@@ -201,6 +206,13 @@ class PERSON_LOCATION_ENTITY:
             self.state = "Unknown"
             self.last_changed = datetime.now()
             self.attributes = {}
+
+        if self.entity_id in self.hass.data[DOMAIN]["sensor_info"]:
+            self.sensor_info = self.hass.data[DOMAIN]["sensor_info"][
+                self.entity_id
+            ].copy()
+        else:
+            self.sensor_info = {}
 
         if "friendly_name" in self.attributes:
             self.friendlyName = self.attributes["friendly_name"]
@@ -242,7 +254,13 @@ class PERSON_LOCATION_ENTITY:
         )
 
     def set_state(self):
+        """Save changed sensor information as a unit.  (No partial updates are done.)"""
         _LOGGER.debug(
-            "(%s.set_state) - %s - %s", self.entity_id, self.state, self.attributes
+            "(%s.set_state) -state: %s -attributes: %s -sensor_info: %s",
+            self.entity_id,
+            self.state,
+            self.attributes,
+            self.sensor_info,
         )
-        self.hass.states.set(self.entity_id, self.state, self.attributes.copy())
+        self.hass.states.set(self.entity_id, self.state, self.attributes)
+        self.hass.data[DOMAIN]["sensor_info"][self.entity_id] = self.sensor_info

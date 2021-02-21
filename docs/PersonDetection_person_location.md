@@ -127,10 +127,6 @@ Input:
           latitude
           longitude
           update_time (optional)
-      - attributes updated in the previous call (to provide deltas):
-          location_latitude
-          location_longitude
-          location_update_time     
 ```
 </details>
 
@@ -145,7 +141,7 @@ This folder contains the files that make up the Person Location custom integrati
 * [MapQuest Geocoding](#mapquest-geocoding)
 
 #### **Calculated Location Attributes**
-By default, the custom integration will update the following attribute names to the sensor.
+By default, the custom integration will set the following attribute names in the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -154,14 +150,11 @@ By default, the custom integration will update the following attribute names to 
 | direction: | stationary     | direction from Home |
 | driving_miles: | 50.6       | distance from Home based on Waze route |
 | driving_minutes: | 46.8     | distance from Home based on Waze traffic conditions |
-| location_latitude: | xx.136533521243905 | saved for next calculations |
-| location_longitude: | -xxx.60796996859035 | saved for next calculations |
-| location_update_time: | 2021-01-31 21:14:28.071609 | saved for next calculations |
 
 *Attribution:* "Data provided by Waze App. Learn more at [Waze.com](https://www.waze.com)"
 
 #### **Open Street Map Geocoding**
-Reverse geocoding generates an address from a latitude and longitude. The Open Street Map reverse geocoding feature updates the following attribute names to the sensor.
+Reverse geocoding generates an address from a latitude and longitude. The Open Street Map reverse geocoding feature sets the following attribute names in the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -175,7 +168,7 @@ If you find problems with the OSM information, feel free to sign up at https://w
 *Attribution:* "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright"
 
 #### **Google Maps Geocoding**
-The Google Maps Geocoding feature updates the following attribute names to the sensor.
+The Google Maps Geocoding feature sets the following attribute names in the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -185,7 +178,7 @@ The Google Maps Geocoding feature updates the following attribute names to the s
 *Attribution:* ![powered by Google](images/powered_by_google_on_non_white.png)
 
 #### **MapQuest Geocoding**
-The MapQuest Reverse Geocoding feature adds the following attribute names to the sensor.
+The MapQuest Reverse Geocoding feature sets the following attribute names in the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |

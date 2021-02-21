@@ -555,10 +555,6 @@ def setup(hass, config):
         #           - latitude
         #           - longitude
         #           - update_time (optional)
-        #         - attributes updated in the previous call (to provide deltas):
-        #           - location_latitude
-        #           - location_longitude
-        #           - location_update_time
         # --------------------------------------------------------------------------------------------------
 
         entity_id = call.data.get(CONF_ENTITY_ID, "NONE")
@@ -656,12 +652,12 @@ def setup(hass, config):
                         else:
                             new_longitude = "None"
 
-                        if "location_latitude" in target.attributes:
-                            old_latitude = target.attributes["location_latitude"]
+                        if "location_latitude" in target.sensor_info:
+                            old_latitude = target.sensor_info["location_latitude"]
                         else:
                             old_latitude = "None"
-                        if "location_longitude" in target.attributes:
-                            old_longitude = target.attributes["location_longitude"]
+                        if "location_longitude" in target.sensor_info:
+                            old_longitude = target.sensor_info["location_longitude"]
                         else:
                             old_longitude = "None"
 
@@ -745,9 +741,9 @@ def setup(hass, config):
                             else:
                                 new_update_time = currentApiTime
 
-                            if "location_update_time" in target.attributes:
+                            if "location_update_time" in target.sensor_info:
                                 old_update_time = datetime.strptime(
-                                    target.attributes["location_update_time"],
+                                    target.sensor_info["location_update_time"],
                                     "%Y-%m-%d %H:%M:%S.%f",
                                 )
                                 _LOGGER.debug(
@@ -824,11 +820,11 @@ def setup(hass, config):
                                 + ") meters_from_home = "
                                 + str(distance_from_home)
                             )
-                            target.attributes["meters_from_home"] = str(
-                                round(distance_from_home, 1)
+                            target.attributes["meters_from_home"] = round(
+                                distance_from_home, 1
                             )
-                            target.attributes["miles_from_home"] = str(
-                                round(distance_from_home / METERS_PER_MILE, 1)
+                            target.attributes["miles_from_home"] = round(
+                                distance_from_home / METERS_PER_MILE, 1
                             )
 
                             if speed_during_interval <= 0.5:
@@ -1117,12 +1113,11 @@ def setup(hass, config):
                                 target.attributes["friendly_name"] = template.replace(
                                     "<locality>", locality
                                 )
-                            target.attributes["location_latitude"] = new_latitude
-                            target.attributes["location_longitude"] = new_longitude
-                            target.attributes["location_update_time"] = str(
+                            target.sensor_info["location_latitude"] = new_latitude
+                            target.sensor_info["location_longitude"] = new_longitude
+                            target.sensor_info["location_update_time"] = str(
                                 new_update_time
                             )
-
                             if "reported_state" in target.attributes:
                                 if target.attributes["reported_state"] != "Away":
                                     newBreadCrumb = target.attributes["reported_state"]
@@ -1143,7 +1138,7 @@ def setup(hass, config):
                             if pli.use_waze == False:
                                 pass
                             elif (
-                                int(target.attributes["meters_from_home"])
+                                target.attributes["meters_from_home"]
                                 < WAZE_MIN_METERS_FROM_HOME
                             ):
                                 target.attributes["driving_miles"] = "0"
