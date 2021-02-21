@@ -9,6 +9,7 @@
 * [Components](#components)
   * [File: automation_folder/person_location_detection.yaml](#file-automation_folderperson_location_detectionyaml)
   * [Service: person_location/process_trigger](#service-person_locationprocess_trigger)
+  * [Service: person_location/reverse_geocode](#service-person_locationreverse_geocode)
   * [Folder: custom_components/person_location](#folder-custom_componentsperson_location)
 * [Installation](#installation)   
   * [Manual installation hints](#manual-installation-hints) 
@@ -21,7 +22,7 @@
 
 ### **Combine the status of multiple device trackers**
 This custom integration will look at all device trackers that are for a particular person and combine them into a single person location sensor, `sensor.<name>_location`. These "device trackers" can be `device_tracker`, `sensor`, or `binary_sensor` entities.  Device tracker state changes are monitored rather than doing polling, averaging the states, or calculating a probability. 
-Device trackers follow a device that the person has; the person location sensor tries to follow the person instead.
+Device trackers follow devices that the person has; the person location sensor tries to follow the person instead.
 
 ### **Make presence detection not so binary**
 When a person is detected as moving between `Home` and `Away`, instead of going straight to `Home` or `Away`, it will temporarily change the person's status to `Just Arrived` or `Just Left` so that automations can be triggered or conditions applied appropriately.
@@ -40,7 +41,7 @@ This automation file contains the example automations that call the `person_loca
 
 Automation `Person Location Update` contains a list of device tracker entities to be monitored. Automation `Person Location Device Tracker Updated` looks at all `state_changed` events to find the ones that belong to device trackers. One automation or the other (or both) will be needed to select the input for the process.
 <details>
-  <summary> Details</summary>
+  <summary> More Details</summary>
 
 Note that `Person Location Update for router home` and `Person Location Update for router not_home` are not currently used by me because it drives my router crazy to be probed all the time.  The intention here was to give a five minute delay before declaring the device not home, so that temporary WIFI dropoffs do not cause inappropriate actions.
 
@@ -66,12 +67,32 @@ The method used to select device trackers and associate them with a person will 
 ### **Service: person_location/process_trigger** 
 This is the service that is called by automation `Person Location Update` following a state change of a device tracker such as a phone, watch, or car.  It creates/updates a Home Assistant sensor named `sensor.<personName>_location`.
 <details>
-  <summary>Details</summary>	
+  <summary>More Details</summary>	
+
+```yaml	
+Input:
+  - Parameters for the call:
+      entity_id
+      from_state
+      to_state
+  - Automation.ha_just_started:
+      on for a few minutes so that "Just Arrived" and "Just Left" don't get set at startup
+  - Attributes of entity_id (supplied by device_tracker process):
+      latitude
+      longitude
+      person_name (if different from what is implied by entity_id = device_tracker.<person_name>_whatever)
+      altitude (optional, passed thru to output sensor)
+      gps_accuracy (optional)
+      source_type (optional)
+      update_time (optional)
+      vertical_accuracy (optional)
+      zone (optional)
+```
 The sensor will be updated with a state such as `Just Arrived`, `Home`, `Just Left`, `Away`, or `Extended Away`.  In addition, selected attributes from the triggered device tracker will be copied to the sensor.  Attributes `source` (the triggering entity ID), `reported_state` (the state reported by the device tracker), `icon` (for the current zone), and `friendly_name` (the status of the person) will be updated.
 	
 Note that the person location sensor state is triggered by state changes such as a device changing zones, so a phone left at home does not get a vote for "home".  The assumption is that if the device is moving, then the person has it.  An effort is also made to show more respect to devices with a higher GPS accuracy.
 
-The built-in Person integration competes somewhat in combining the status of multiple device trackers.  I expect that its ability to determine the actual presence and location of a person will improve with time.  If you prefer the selection priority that the built-in Person integration provides, only call the `person_location/process_trigger` service for change of the `person.<personName>` entity rather than the upstream device trackers.  Do not mix the two.
+The built-in Person integration competes somewhat in combining the status of multiple device trackers.  I expect that its ability to determine the actual presence and location of a person will improve with time.  If you prefer the selection priority that the built-in Person integration provides, only call the `person_location/process_trigger` service for changes of the `person.<personName>` entity rather than the upstream device trackers.  Do not mix the two.
 
 #### **Person location sensor example (output)**
 
@@ -91,10 +112,28 @@ The built-in Person integration competes somewhat in combining the status of mul
 | | | icon: | mdi:home | icon for the zone of the location |
 </details>
 
+### **Service: person_location/reverse_geocode** 
+This is the service to reverse geocode the location in a sensor and it is called by `person_location/process_trigger`.  It could also be called by other integrations to do the same for their sensors. 
+<details>
+  <summary>More Details</summary>
+
+```yaml	
+Input:
+  - Parameters for the call:
+      entity_id
+      friendly_name_template (optional)
+  - Attributes of entity_id:
+      - attributes supplied by another process (to provide current location):
+          latitude
+          longitude
+          update_time (optional)
+```
+</details>
+
 ### **Folder: custom_components/person_location**
 This folder contains the files that make up the Person Location custom integration.
 <details>
-  <summary>Details</summary>
+  <summary>More Details</summary>
 
 * [Calculated Location Attributes](#calculated-location-attributes)
 * [Open Street Map Geocoding](#open-street-map-geocoding)
@@ -102,7 +141,7 @@ This folder contains the files that make up the Person Location custom integrati
 * [MapQuest Geocoding](#mapquest-geocoding)
 
 #### **Calculated Location Attributes**
-By default, the custom integration will update the following attribute names to the sensor.
+By default, the custom integration will set the following attribute names in the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -111,14 +150,11 @@ By default, the custom integration will update the following attribute names to 
 | direction: | stationary     | direction from Home |
 | driving_miles: | 50.6       | distance from Home based on Waze route |
 | driving_minutes: | 46.8     | distance from Home based on Waze traffic conditions |
-| location_latitude: | xx.136533521243905 | saved for next calculations |
-| location_longitude: | -xxx.60796996859035 | saved for next calculations |
-| location_update_time: | 2021-01-31 21:14:28.071609 | saved for next calculations |
 
 *Attribution:* "Data provided by Waze App. Learn more at [Waze.com](https://www.waze.com)"
 
 #### **Open Street Map Geocoding**
-Reverse geocoding generates an address from a latitude and longitude. The Open Street Map reverse geocoding feature updates the following attribute names to the sensor.
+Reverse geocoding generates an address from a latitude and longitude. The Open Street Map reverse geocoding feature sets the following attribute names in the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -132,7 +168,7 @@ If you find problems with the OSM information, feel free to sign up at https://w
 *Attribution:* "Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright"
 
 #### **Google Maps Geocoding**
-The Google Maps Geocoding feature updates the following attribute names to the sensor.
+The Google Maps Geocoding feature sets the following attribute names in the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -142,7 +178,7 @@ The Google Maps Geocoding feature updates the following attribute names to the s
 *Attribution:* ![powered by Google](images/powered_by_google_on_non_white.png)
 
 #### **MapQuest Geocoding**
-The MapQuest Reverse Geocoding feature adds the following attribute names to the sensor.
+The MapQuest Reverse Geocoding feature sets the following attribute names in the sensor.
 
 | Attribute Name            | Example | Description |
 | :------------------------ | :------ | :---------- |
@@ -154,7 +190,7 @@ The MapQuest Reverse Geocoding feature adds the following attribute names to the
 
 ## Installation
 ### **Manual Installation Hints**
-1. Copy the components into the appropriate folder under `<config>`.
+1. Copy the components into the appropriate folders under `<config>`.
 
 2. Update file `<config>/automation_folder/presence-detection.yaml` as appropriate for your devices.  This file may need to be placed elsewhere or merged into `<config>automation.yaml`, depending on how your configuration is organized. My Home Assistant configuration is split into [multiple folders](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
 
@@ -178,7 +214,7 @@ The MapQuest Reverse Geocoding feature adds the following attribute names to the
 | `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor` as in `sensor.<name>_location`.
 | `region`         | Yes | Region parameter for the Google API. | `US`
 <details>
-  <summary>Details</summary>
+  <summary>More Details</summary>
 
 * [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
 * [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)
