@@ -6,16 +6,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  # validate_hacs:
-  #   name: HACS
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: Validate
-  #       uses: hacs/integration/action@main
-  #       with:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         CATEGORY: integration
+  validate_hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Validate
+        uses: hacs/integration/action@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CATEGORY: integration
   validate_hassfest:
     name: Hassfest
     runs-on: ubuntu-latest
@@ -45,7 +45,7 @@ jobs:
           python -m pip install --upgrade flake8 wemake-python-styleguide
       - name: Lint with flake8
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=python_scripts
       - name: Don't mind this
         run: |
           flake8 . --inline-quotes '"' --count --exit-zero --max-complexity=15 --max-line-length=90 --statistics --select=I,P,WPS305,C812,E203,W503,E800
