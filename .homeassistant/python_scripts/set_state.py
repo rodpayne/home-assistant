@@ -1,12 +1,15 @@
-# ==================================================================================================
-#  python_scripts/set_state.py
-#  modified from - https://community.home-assistant.io/t/how-to-manually-set-state-value-of-sensor/43975/37
-# ==================================================================================================
+"""Set the state or other attributes for the specified entity."""
 
-# --------------------------------------------------------------------------------------------------
+# ========================================================================================
+# python_scripts/set_state.py
+# modified from -
+# https://community.home-assistant.io/t/how-to-manually-set-state-value-of-sensor/43975/37
+# ========================================================================================
+
+# ----------------------------------------------------------------------------------------
 # Set the state or other attributes for the specified entity.
 # Updates from @xannor so that a new entity can be created if it does not exist.
-# --------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
 
 inputEntity = data.get("entity_id")
 if inputEntity is None:

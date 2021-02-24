@@ -1,6 +1,7 @@
-""" Constants """
+"""Constants and Classes for person_location integration."""
+
 import logging
-import threading
+
 from datetime import datetime, timedelta
 
 import homeassistant.helpers.config_validation as cv
@@ -18,7 +19,7 @@ from homeassistant.components.waze_travel_time.sensor import REGIONS as WAZE_REG
 DOMAIN = "person_location"
 INTEGRATION_NAME = "Person Location"
 ISSUE_URL = "https://github.com/rodpayne/home-assistant/issues"
-VERSION = "2021.02.20"
+VERSION = "2021.02.23"
 
 # Fixed Parameters
 MIN_DISTANCE_TRAVELLED = 5
@@ -31,6 +32,9 @@ WAZE_MIN_METERS_FROM_HOME = 500
 API_STATE_OBJECT = DOMAIN + "." + DOMAIN + "_api"
 METERS_PER_KM = 1000
 METERS_PER_MILE = 1609.34
+
+# Attribute names:
+ATTR_BREAD_CRUMBS = "bread_crumbs"
 
 # Configuration Parameters
 CONF_LANGUAGE = "language"
@@ -56,10 +60,26 @@ CONF_MAPQUEST_API_KEY = "mapquest_api_key"
 CONF_OSM_API_KEY = "osm_api_key"
 DEFAULT_API_KEY_NOT_SET = "no key"
 
+CONF_CREATE_SENSORS = "create_sensors"
+VALID_CREATE_SENSORS = [
+    "altitude",
+    ATTR_BREAD_CRUMBS,
+    "direction",
+    "driving_miles",
+    "driving_minutes",
+    "geocoded",
+    "latitude",
+    "longitude",
+    "meters_from_home",
+    "miles_from_home",
+]
 CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
             {
+                vol.Optional(CONF_CREATE_SENSORS, default=[]): vol.All(
+                    cv.ensure_list, [cv.string]
+                ),
                 vol.Optional(
                     CONF_HOURS_EXTENDED_AWAY, default=DEFAULT_HOURS_EXTENDED_AWAY
                 ): cv.string,
@@ -93,8 +113,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class PERSON_LOCATION_INTEGRATION:
+    """Class to represent the integration itself."""
+
     def __init__(self, entity_id, _hass, _config):
-        """ Initialize the integration instance """
+        """Initialize the integration instance."""
+
         # log startup message
         _LOGGER.info(
             CC_STARTUP_VERSION.format(
@@ -154,7 +177,7 @@ class PERSON_LOCATION_INTEGRATION:
         self.configured_osm_api_key = self.config[DOMAIN].get(
             CONF_OSM_API_KEY, DEFAULT_API_KEY_NOT_SET
         )
-        # may need to split these up later:
+        # TODO: may need to split these up later (Google vs Waze):
         self.configured_google_region = self.config[DOMAIN].get(
             CONF_REGION, DEFAULT_REGION
         )
@@ -165,9 +188,22 @@ class PERSON_LOCATION_INTEGRATION:
             self.use_waze = True
         else:
             self.use_waze = False
-            _LOGGER.error("Configured Waze region is not valid")
+            _LOGGER.warning("Configured Waze region is not valid")
+        self.create_sensors = [
+            x.strip()
+            for x in self.config[DOMAIN].get(CONF_CREATE_SENSORS, []).split(",")
+        ]
+        for sensor_name in self.create_sensors:
+            if sensor_name not in VALID_CREATE_SENSORS:
+                _LOGGER.error(
+                    "Configured %s: %s is not valid",
+                    CONF_CREATE_SENSORS,
+                    sensor_name,
+                )
+        # TODO: self.create_sensors.pop(sensor_name)?
 
         self.hass.data[DOMAIN] = {
+            "configured_create_sensors": self.create_sensors,
             "configured_output_platform": self.configured_output_platform,
             "sensor_info": {},
         }
@@ -184,8 +220,10 @@ class PERSON_LOCATION_INTEGRATION:
 
 
 class PERSON_LOCATION_ENTITY:
+    """Class to represent device trackers and our person location sensors."""
+
     def __init__(self, entity_id, _hass):
-        """ Initialize the entity instance """
+        """Initialize the entity instance."""
 
         self.entity_id = entity_id
         self.hass = _hass
@@ -253,8 +291,47 @@ class PERSON_LOCATION_ENTITY:
             configured_output_platform + "." + self.personName.lower() + "_location"
         )
 
+    def make_template_sensor(self, attributeName, supplementalAttributeArray):
+        """Make an additional sensor that will be used instead of making a template sensor."""
+
+        if type(attributeName) is str:
+            if attributeName in self.attributes:
+                templateSuffix = attributeName
+                templateState = self.attributes[attributeName]
+            else:
+                return
+        elif type(attributeName) is dict:
+            templateSuffix = keys(attributeName)[0]
+            templateState = attributeName[templateSuffix]
+
+        templateAttributes = {}
+        for supplementalAttribute in supplementalAttributeArray:
+            if type(supplementalAttribute) is str:
+                if supplementalAttribute in self.attributes:
+                    templateAttributes[supplementalAttribute] = self.attributes[
+                        supplementalAttribute
+                    ]
+            elif type(supplementalAttribute) is dict:
+                for supplementalAttributeKey in supplementalAttribute:
+                    templateAttributes[
+                        supplementalAttributeKey
+                    ] = supplementalAttribute[supplementalAttributeKey]
+            else:
+                _LOGGER.debug(
+                    "supplementalAttribute %s %s",
+                    supplementalAttribute,
+                    type(supplementalAttribute),
+                )
+
+        self.hass.states.set(
+            "sensor." + self.personName.lower() + "_location_" + templateSuffix.lower(),
+            templateState,
+            templateAttributes,
+        )
+
     def set_state(self):
-        """Save changed sensor information as a unit.  (No partial updates are done.)"""
+        """Save changed target sensor information as a unit."""
+
         _LOGGER.debug(
             "(%s.set_state) -state: %s -attributes: %s -sensor_info: %s",
             self.entity_id,
@@ -264,3 +341,86 @@ class PERSON_LOCATION_ENTITY:
         )
         self.hass.states.set(self.entity_id, self.state, self.attributes)
         self.hass.data[DOMAIN]["sensor_info"][self.entity_id] = self.sensor_info
+
+    def make_template_sensors(self):
+        """Make the additional sensors if they are requested."""
+
+        configured_create_sensors = self.hass.data[DOMAIN]["configured_create_sensors"]
+        for attributeName in configured_create_sensors:
+            if (
+                attributeName == "altitude"
+                and "altitude" in self.attributes
+                and self.attributes["altitude"] != 0
+                and "vertical_accuracy" in self.attributes
+                and self.attributes["vertical_accuracy"] != 0
+            ):
+                self.make_template_sensor(
+                    "altitude",
+                    ["vertical_accuracy", "icon", {"unit_of_measurement": "m"}],
+                )
+
+            elif attributeName == ATTR_BREAD_CRUMBS:
+                self.make_template_sensor(ATTR_BREAD_CRUMBS, ["icon"])
+
+            elif attributeName == "direction":
+                self.make_template_sensor("direction", ["icon"])
+
+            elif attributeName == "driving_miles":
+                self.make_template_sensor(
+                    "driving_miles",
+                    [
+                        "driving_minutes",
+                        "meters_from_home",
+                        "miles_from_home",
+                        {"unit_of_measurement": "mi"},
+                        "icon",
+                    ],
+                )
+
+            elif attributeName == "driving_minutes":
+                self.make_template_sensor(
+                    "driving_minutes",
+                    [
+                        "driving_miles",
+                        "meters_from_home",
+                        "miles_from_home",
+                        {"unit_of_measurement": "min"},
+                        "icon",
+                    ],
+                )
+
+            elif attributeName == "geocoded":
+                pass
+
+            elif attributeName == "latitude":
+                self.make_template_sensor("latitude", ["gps_accuracy", "icon"])
+
+            elif attributeName == "longitude":
+                self.make_template_sensor("longitude", ["gps_accuracy", "icon"])
+
+            elif attributeName == "meters_from_home":
+                self.make_template_sensor(
+                    "meters_from_home",
+                    [
+                        "miles_from_home",
+                        "driving_miles",
+                        "driving_minutes",
+                        "icon",
+                        {"unit_of_measurement": "m"},
+                    ],
+                )
+
+            elif attributeName == "miles_from_home":
+                self.make_template_sensor(
+                    "miles_from_home",
+                    [
+                        "meters_from_home",
+                        "driving_miles",
+                        "driving_minutes",
+                        {"unit_of_measurement": "mi"},
+                        "icon",
+                    ],
+                )
+
+            else:
+                self.make_template_sensor(attributeName, ["icon"])

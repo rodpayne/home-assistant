@@ -5,7 +5,7 @@
 from homeassistant.components import system_health
 from homeassistant.core import HomeAssistant, callback
 
-from .const import API_STATE_OBJECT, DOMAIN, VERSION
+from .const import API_STATE_OBJECT, VERSION
 
 
 @callback
