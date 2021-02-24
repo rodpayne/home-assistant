@@ -204,6 +204,7 @@ The MapQuest Reverse Geocoding feature sets the following attribute names in the
 
 | Parameter | Optional | Description | Default |
 | :-------- | :------: | :---------- | :------ |
+| `creat_sensors`  | Yes | List of attributes for which individual sensors are to be created so that template sensors do not need to be configured.  Choose from this list: `altitude`, `bread_crumbs`, `direction`, `driving_miles`, `driving_minutes`, `geocoded`, `latitude`, `longitude`, `meters_from_home`, `miles_from_home`. | None
 | `extended_away`  | Yes | Number of **hours** before changing `Away` into `Extended Away`. | `48`
 | `google_api_key` | Yes | Google API Key obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). | Do not do the Google reverse geocoding.
 | `just_arrived`   | Yes | Number of **minutes** before changing `Just Arrived` into `Home`. | `3`

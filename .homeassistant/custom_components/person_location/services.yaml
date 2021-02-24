@@ -13,6 +13,10 @@ reverse_geocode:
     friendly_name_template:
       description: Template for the entitiy's friendly_name (optional)
       example: "Rod (Rod's iPhone) is in <locality>"
+    force_update:
+      description: Should geocoding be done even if the distance is less than MIN_DISTANCE_TRAVELLED (5 meters)?  (optional)
+      example: True
+      
       
 geocode_api_on:
   # Description of the service
