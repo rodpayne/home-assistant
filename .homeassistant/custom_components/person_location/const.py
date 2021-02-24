@@ -19,7 +19,7 @@ from homeassistant.components.waze_travel_time.sensor import REGIONS as WAZE_REG
 DOMAIN = "person_location"
 INTEGRATION_NAME = "Person Location"
 ISSUE_URL = "https://github.com/rodpayne/home-assistant/issues"
-VERSION = "2021.02.20"
+VERSION = "2021.02.23"
 
 # Fixed Parameters
 MIN_DISTANCE_TRAVELLED = 5
