@@ -1328,3 +1328,11 @@ def setup(hass, config):
 
     # Return boolean to indicate that setup was successful.
     return True
+
+
+async def async_setup_entry(hass, entry):
+    _LOGGER.debug("===== entry.data = %s; type = %s", entry.data, type(entry.data))
+    #    for item in entry.data:
+    #        _LOGGER.debug("item = %s; type = %s", item, type(item))
+
+    return True

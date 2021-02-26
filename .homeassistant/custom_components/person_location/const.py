@@ -58,7 +58,7 @@ DEFAULT_REGION = "US"
 CONF_GOOGLE_API_KEY = "google_api_key"
 CONF_MAPQUEST_API_KEY = "mapquest_api_key"
 CONF_OSM_API_KEY = "osm_api_key"
-DEFAULT_API_KEY_NOT_SET = "no key"
+DEFAULT_API_KEY_NOT_SET = "not used"
 
 CONF_CREATE_SENSORS = "create_sensors"
 VALID_CREATE_SENSORS = [
@@ -78,7 +78,7 @@ CONFIG_SCHEMA = vol.Schema(
         DOMAIN: vol.Schema(
             {
                 vol.Optional(CONF_CREATE_SENSORS, default=[]): vol.All(
-                    cv.ensure_list, [cv.string]
+                    cv.ensure_list, [vol.In(VALID_CREATE_SENSORS)]
                 ),
                 vol.Optional(
                     CONF_HOURS_EXTENDED_AWAY, default=DEFAULT_HOURS_EXTENDED_AWAY

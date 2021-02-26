@@ -2,11 +2,13 @@
   "domain": "person_location",
   "name": "Person Location",
   "documentation": "https://github.com/rodpayne/home-assistant",
+  "issue_tracker": "https://github.com/rodpayne/home-assistant/issues",
   "dependencies": [
     "device_tracker",
     "sensor",
     "zone"
   ],
+  "config_flow": true,
   "codeowners": [
     "@rodpayne"
   ],
