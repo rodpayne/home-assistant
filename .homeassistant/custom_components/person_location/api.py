@@ -1,12 +1,10 @@
 """API Client Wrapper."""
 
-import logging
 import asyncio
-import re
+import logging
 import socket
 import traceback
 
-# from typing import Optional
 import aiohttp
 import async_timeout
 

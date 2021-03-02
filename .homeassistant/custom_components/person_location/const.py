@@ -169,7 +169,7 @@ class PERSON_LOCATION_INTEGRATION:
         )
         self.attributes["api_last_updated"] = datetime.now()
         self.attributes["api_error_count"] = 0
-        self.attributes["api_calls_attempted"] = 0
+        self.attributes["api_calls_requested"] = 0
         self.attributes["api_calls_skipped"] = 0
         self.attributes["api_calls_throttled"] = 0
         self.attributes["waze_error_count"] = 0
@@ -311,7 +311,7 @@ class PERSON_LOCATION_ENTITY:
                 self.entity_id
             ].copy()
         else:
-            self.entity_sensor_info = {}
+            self.entity_sensor_info = {"trigger_count": 0, "geocode_count": 0}
 
         if "friendly_name" in self.attributes:
             self.friendlyName = self.attributes["friendly_name"]

@@ -258,11 +258,7 @@ def setup(hass, config):
                 _LOGGER.debug("[handle_process_trigger]" + " target_lock obtained")
                 target = PERSON_LOCATION_ENTITY(trigger.targetName, hass)
 
-                if "location_update_time" in target.entity_sensor_info:
-                    old_update_time = datetime.strptime(
-                        target.entity_sensor_info["location_update_time"],
-                        "%Y-%m-%d %H:%M:%S.%f",
-                    )
+                target.entity_sensor_info["trigger_count"] += 1
 
                 if triggerTo == "NotSet":
                     _LOGGER.debug(
@@ -667,7 +663,7 @@ def setup(hass, config):
 
                     pli.attributes["api_last_updated"] = currentApiTime
 
-                    pli.attributes["api_calls_attempted"] += 1
+                    pli.attributes["api_calls_requested"] += 1
 
                     counter_attribute = f"{entity_id} calls"
                     if counter_attribute in pli.attributes:
@@ -1216,6 +1212,7 @@ def setup(hass, config):
                                 target.attributes["friendly_name"] = template.replace(
                                     "<locality>", locality
                                 )
+                            target.entity_sensor_info["geocode_count"] += 1
                             target.entity_sensor_info[
                                 "location_latitude"
                             ] = new_latitude

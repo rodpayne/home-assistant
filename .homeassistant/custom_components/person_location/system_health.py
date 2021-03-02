@@ -6,7 +6,6 @@ from homeassistant.components import system_health
 from homeassistant.core import HomeAssistant, callback
 
 from .const import (
-    API_STATE_OBJECT,
     DATA_ATTRIBUTES,
     DATA_CONFIG_ENTRY,
     DATA_SENSOR_INFO,
@@ -41,9 +40,16 @@ async def system_health_info(hass):
 
         return_info["State"] = apiState
 
-        attr_value = apiAttributesObject["api_calls_attempted"]
+        if DATA_CONFIG_ENTRY in hass.data[DOMAIN]:
+            return_info["Integration Configuration"] = hass.data[DOMAIN][
+                DATA_CONFIG_ENTRY
+            ].state
+        else:
+            return_info["Integration Configuration"] = "yaml only"
+
+        attr_value = apiAttributesObject["api_calls_requested"]
         if attr_value != 0:
-            return_info["Geolocation Calls Attempted"] = attr_value
+            return_info["Geolocation Calls Requested"] = attr_value
 
         attr_value = apiAttributesObject["api_calls_skipped"]
         if attr_value != 0:
@@ -61,11 +67,7 @@ async def system_health_info(hass):
         if attr_value != 0:
             return_info["WAZE Error Count"] = attr_value
 
-        if DATA_CONFIG_ENTRY in hass.data[DOMAIN]:
-            return_info["Integration Configuration"] = hass.data[DOMAIN][
-                DATA_CONFIG_ENTRY
-            ].state
-        else:
-            return_info["Integration Configuration"] = "yaml only"
+        for sensor in sensor_info:
+            return_info[sensor] = sensor_info[sensor]["geocode_count"]
 
     return return_info
