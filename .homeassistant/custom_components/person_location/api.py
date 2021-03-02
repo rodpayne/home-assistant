@@ -1,6 +1,8 @@
-"""Sample API Client."""
+"""API Client Wrapper."""
+
 import logging
 import asyncio
+import re
 import socket
 import traceback
 
@@ -15,7 +17,7 @@ _LOGGER: logging.Logger = logging.getLogger(__package__)
 HEADERS = {"Content-type": "application/json; charset=UTF-8"}
 
 
-class PersonLocationApiClient:
+class PersonLocation_aiohttp_Client:
     def __init__(self, session: aiohttp.ClientSession) -> None:
         self._session = session
 
@@ -50,27 +52,28 @@ class PersonLocationApiClient:
                     response = await self._session.post(url, headers=headers, json=data)
                     return await response.json()
         except asyncio.TimeoutError as exception:
-            # TODO: don't leak key in the URL
-            error_message = (
-                f"Timeout error fetching information from {url} - {exception}"
-            )
+            error_message = f"Timeout error fetching information from {url.split('?',1)[0]} - {exception}"
             _LOGGER.error(error_message)
             return {"error": error_message}
 
         except (KeyError, TypeError) as exception:
-            # TODO: don't leak key in the URL
-            error_message = f"Error parsing information from {url} - {exception}"
+            error_message = (
+                f"Error parsing information from {url.split('?',1)[0]} - {exception}"
+            )
             _LOGGER.error(error_message)
             return {"error": error_message}
 
         except (aiohttp.ClientError, socket.gaierror) as exception:
-            # TODO: don't leak key in the URL
-            error_message = f"Error fetching information from {url} - {exception}"
+            error_message = (
+                f"Error fetching information from {url.split('?',1)[0]} - {exception}"
+            )
             _LOGGER.error(error_message)
             return {"error": error_message}
 
         except Exception as exception:  # pylint: disable=broad-except
-            error_message = f"Something wrong happened! - {exception}"
+            error_message = (
+                f"Something wrong happened! - {type(e).__name__}: {exception}"
+            )
             _LOGGER.error(error_message)
             _LOGGER.debug(traceback.format_exc())
             return {"error": error_message}

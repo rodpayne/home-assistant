@@ -5,7 +5,15 @@
 from homeassistant.components import system_health
 from homeassistant.core import HomeAssistant, callback
 
-from .const import API_STATE_OBJECT, VERSION
+from .const import (
+    API_STATE_OBJECT,
+    DATA_ATTRIBUTES,
+    DATA_CONFIG_ENTRY,
+    DATA_SENSOR_INFO,
+    DATA_STATE,
+    DOMAIN,
+    VERSION,
+)
 
 
 @callback
@@ -17,14 +25,19 @@ def async_register(
 
 
 async def system_health_info(hass):
-    """Get info for the info page."""
+    """Get info for the system health info (Configuration > Info)."""
+
     return_info = {}
     return_info["Version"] = VERSION
 
-    apiStateObject = hass.states.get(API_STATE_OBJECT)
-    if apiStateObject != None:
-        apiState = apiStateObject.state
-        apiAttributesObject = apiStateObject.attributes.copy()
+    if (
+        DATA_STATE in hass.data[DOMAIN]
+        and DATA_ATTRIBUTES in hass.data[DOMAIN]
+        and DATA_SENSOR_INFO in hass.data[DOMAIN]
+    ):
+        apiState = hass.data[DOMAIN][DATA_STATE]
+        apiAttributesObject = hass.data[DOMAIN][DATA_ATTRIBUTES]
+        sensor_info = hass.data[DOMAIN][DATA_SENSOR_INFO]
 
         return_info["State"] = apiState
 
@@ -47,5 +60,12 @@ async def system_health_info(hass):
         attr_value = apiAttributesObject["waze_error_count"]
         if attr_value != 0:
             return_info["WAZE Error Count"] = attr_value
+
+        if DATA_CONFIG_ENTRY in hass.data[DOMAIN]:
+            return_info["Integration Configuration"] = hass.data[DOMAIN][
+                DATA_CONFIG_ENTRY
+            ].state
+        else:
+            return_info["Integration Configuration"] = "yaml only"
 
     return return_info
