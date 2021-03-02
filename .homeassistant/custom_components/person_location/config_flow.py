@@ -1,14 +1,12 @@
 """Add config flow for Person Location."""
 
-import json
 import logging
 import re
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
+from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
-from requests import get
 
 from .api import PersonLocation_aiohttp_Client
 from .const import (
@@ -182,14 +180,15 @@ class PersonLocationFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
                             break
                 if our_current_entry_configured:
                     _LOGGER.debug("previous entry.data = %s", our_current_entry.data)
-                    # TODO: Update instead of create, or delete the old one first
-                    #    return self.async_update_entry(
-                    #        title=location_name, data=self._user_input
-                    #    )
-                    return self.async_create_entry(
-                        title=location_name, data=self._user_input
+                    changed = self.hass.config_entries.async_update_entry(
+                        our_current_entry, data=self._user_input
                     )
-
+                    if changed:
+                        # TODO: Figure out how to exit the flow gracefully:
+                        return self.async_abort(reason="normal exit")
+                    else:
+                        self._errors["base"] = "nothing was changed"
+                        return await self.async_step_user()
                 else:
                     return self.async_create_entry(
                         title=location_name, data=self._user_input
