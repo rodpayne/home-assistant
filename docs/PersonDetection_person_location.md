@@ -23,6 +23,36 @@
 ### **Combine the status of multiple device trackers**
 This custom integration will look at all device trackers that are for a particular person and combine them into a single person location sensor, `sensor.<name>_location`. These "device trackers" can be `device_tracker`, `sensor`, or `binary_sensor` entities.  Device tracker state changes are monitored rather than doing polling, averaging the states, or calculating a probability. 
 Device trackers follow devices that the person has; the person location sensor tries to follow the person instead.
+<details>
+  <summary> Click for More Details</summary>
+The process for deciding which triggered device trackers to pay attention to is somewhat controversial, but here is how we do it. Each update of a "device tracker" (the trigger) is examined to decide if it should be used to update the person location sensor (the target).
+
+* `Trigger` is the `target` itself:
+  * Skip
+* `Trigger` state is `NotSet`:
+  * Skip
+* First `trigger` for the `target`:
+  * Accept
+* `Target` has `unknown` state:
+  * Accept
+* `Trigger` source is `GPS`:
+  * `Trigger` changed zones:
+    * Accept
+  * `Trigger` did not change zones:
+    * `Target` is not "following" a particular `trigger`:
+      * Accept
+    * `Target` is already following this `trigger`:
+      * Accept
+    * `Trigger` has the same state as the one being followed:
+      * `Trigger` accuracy is better than the one being followed:
+        * Accept
+* `Trigger` source is not `GPS`
+  * `Trigger` changed state:
+    * `Trigger` implies Home and `Target` is not Home:
+      * Accept
+    * `Trigger` implies Away and `Target` is Home:
+      * Accept
+</details>
 
 ### **Make presence detection not so binary**
 When a person is detected as moving between `Home` and `Away`, instead of going straight to `Home` or `Away`, it will temporarily change the person's status to `Just Arrived` or `Just Left` so that automations can be triggered or conditions applied appropriately.
@@ -41,7 +71,7 @@ This automation file contains the example automations that call the `person_loca
 
 Automation `Person Location Update` contains a list of device tracker entities to be monitored. Automation `Person Location Device Tracker Updated` looks at all `state_changed` events to find the ones that belong to device trackers. One automation or the other (or both) will be needed to select the input for the process.
 <details>
-  <summary> More Details</summary>
+  <summary> Click for More Details</summary>
 
 Note that `Person Location Update for router home` and `Person Location Update for router not_home` are not currently used by me because it drives my router crazy to be probed all the time.  The intention here was to give a five minute delay before declaring the device not home, so that temporary WIFI dropoffs do not cause inappropriate actions.
 
@@ -67,7 +97,7 @@ The method used to select device trackers and associate them with a person will 
 ### **Service: person_location/process_trigger** 
 This is the service that is called by automation `Person Location Update` following a state change of a device tracker such as a phone, watch, or car.  It creates/updates a Home Assistant sensor named `sensor.<personName>_location`.
 <details>
-  <summary>More Details</summary>	
+  <summary>Click for More Details</summary>	
 
 ```yaml	
 Input:
@@ -115,7 +145,7 @@ The built-in Person integration competes somewhat in combining the status of mul
 ### **Service: person_location/reverse_geocode** 
 This is the service to reverse geocode the location in a sensor and it is called by `person_location/process_trigger`.  It could also be called by other integrations to do the same for their sensors. 
 <details>
-  <summary>More Details</summary>
+  <summary>Click for More Details</summary>
 
 ```yaml	
 Input:
@@ -133,7 +163,7 @@ Input:
 ### **Folder: custom_components/person_location**
 This folder contains the files that make up the Person Location custom integration.
 <details>
-  <summary>More Details</summary>
+  <summary>Click for More Details</summary>
 
 * [Calculated Location Attributes](#calculated-location-attributes)
 * [Open Street Map Geocoding](#open-street-map-geocoding)
@@ -202,20 +232,20 @@ The MapQuest Reverse Geocoding feature sets the following attribute names in the
 
 ### **Configuration Parameters**
 
-| Parameter | Optional | Description | Default |
-| :-------- | :------: | :---------- | :------ |
-| `creat_sensors`  | Yes | List of attributes for which individual sensors are to be created so that template sensors do not need to be configured.  Choose from this list: `altitude`, `bread_crumbs`, `direction`, `driving_miles`, `driving_minutes`, `geocoded`, `latitude`, `longitude`, `meters_from_home`, `miles_from_home`. | None
-| `extended_away`  | Yes | Number of **hours** before changing `Away` into `Extended Away`. | `48`
-| `google_api_key` | Yes | Google API Key obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). | Do not do the Google reverse geocoding.
-| `just_arrived`   | Yes | Number of **minutes** before changing `Just Arrived` into `Home`. | `3`
-| `just_left`      | Yes | Number of **minutes** before changing `Just Left` into `Away`. | `3`
-| `language`       | Yes | Language parameter for the Google API. | `en`
-| `mapquest_api_key`    | Yes | MapQuest API Key obtained from the [MapQuest Developer site](https://developer.mapquest.com/user/me/apps). | Do not do the MapQuest reverse geocoding.
-| `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. | Do not do the OSM reverse geocoding.
-| `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor` as in `sensor.<name>_location`.
-| `region`         | Yes | Region parameter for the Google API. | `US`
+| GUI Parameter | YAML Parameter | Optional | Description | Default |
+| :------------ | :------------- | :------: | :---------- | :------ |
+| Google API Key | `google_api_key` | Yes | Google API Key obtained from the [Google Maps Platform](https://cloud.google.com/maps-platform#get-started). | Do not do the Google reverse geocoding.
+| Google Language | `language`       | Yes | Language parameter for the Google API. | `en`
+| Google Region | `region`         | Yes | Region parameter for the Google API. | `US`
+| Hours Extended Away | `extended_away`  | Yes | Number of **hours** before changing `Away` into `Extended Away`. | `48`
+| MapQuest API Key | `mapquest_api_key`    | Yes | MapQuest API Key obtained from the [MapQuest Developer site](https://developer.mapquest.com/user/me/apps). | Do not do the MapQuest reverse geocoding.
+| Minutes Just Arrived | `just_arrived`   | Yes | Number of **minutes** before changing `Just Arrived` into `Home`. | `3`
+| Minutes Just Left | `just_left`      | Yes | Number of **minutes** before changing `Just Left` into `Away`. | `3`
+| OSM API Key (your eMail Address) | `osm_api_key`    | Yes | Contact email address to be used by the Open Street Map API. | Do not do the OSM reverse geocoding.
+| Platform for output sensor | `platform`       | Yes | Platform used for the person location "sensor". (Experimental.) | `sensor` as in `sensor.<name>_location`.
+| Sensors to be created | `creat_sensors`  | Yes | List of attributes for which individual sensors are to be created so that template sensors do not need to be configured.  Choose from this list: `altitude`, `bread_crumbs`, `direction`, `driving_miles`, `driving_minutes`, `geocoded`, `latitude`, `longitude`, `meters_from_home`, `miles_from_home`. | None
 <details>
-  <summary>More Details</summary>
+  <summary>Click for More Details</summary>
 
 * [Open Street Map Geocoding Configuration](#open-street-map-geocoding-configuration)
 * [Google Maps Geocoding Configuration](#google-maps-geocoding-configuration)

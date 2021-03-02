@@ -10,12 +10,12 @@ reverse_geocode:
       description: Name of the entitity to examine and update
       # Example value that can be passed for this field
       example: "sensor.rod_location"
-    friendly_name_template:
-      description: Template for the entitiy's friendly_name (optional)
-      example: "Rod (Rod's iPhone) is in <locality>"
     force_update:
       description: Should geocoding be done even if the distance is less than MIN_DISTANCE_TRAVELLED (5 meters)?  (optional)
       example: True
+    friendly_name_template:
+      description: Template for the entitiy's friendly_name (optional)
+      example: "Rod (Rod's iPhone) is in <locality>"
       
       
 geocode_api_on:

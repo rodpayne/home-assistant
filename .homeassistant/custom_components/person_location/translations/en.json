@@ -1,0 +1,57 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Person Location Geocode Configuration (Config Flow Implementation in Progress)",
+                "description": "Reverse geocoding can be done using one (or more) of three services.  If you need help with the configuration or obtaining keys, have a look at More Details [**here**](https://github.com/rodpayne/home-assistant/blob/master/docs/PersonDetection_person_location.md#configuration-parameters).",
+                "data": {
+                    "language": "Google Language",
+                    "region": "Google Region",
+                    "google_api_key": "Google API Key",
+                    "mapquest_api_key": "MapQuest API Key",
+                    "osm_api_key": "OSM API Key (your eMail Address)"
+                }
+            },
+            "geocode": {
+                "title": "Person Location Geocode Configuration",
+                "description": "Reverse geocoding can be done using one (or more) of three services.  If you need help with the configuration or obtaining keys, have a look at More Details [**here**](https://github.com/rodpayne/home-assistant/blob/master/docs/PersonDetection_person_location.md#configuration-parameters).",
+                "data": {
+                    "language": "Google Language",
+                    "region": "Google Region",
+                    "google_api_key": "Google API Key",
+                    "mapquest_api_key": "MapQuest API Key",
+                    "osm_api_key": "OSM API Key (your eMail Address)"
+                }
+            },
+            "sensors": {
+                "title": "Person Location Sensors Configuration",
+                "description": "Individual sensors can be created so that template sensors do not need to be configured. Choose from this list: altitude, bread_crumbs, direction, driving_miles, driving_minutes, geocoded, latitude, longitude, meters_from_home, miles_from_home.  If you need help with the configuration, have a look [**here**](https://github.com/rodpayne/home-assistant/blob/master/docs/PersonDetection_person_location.md#configuration-parameters).",
+                "data": {
+                    "create_sensors": "Sensors to be created",
+                    "platform": "Platform for output sensor"
+                }
+            }
+        },
+        "error": {
+            "sensor_invalid": "Invalid sensor entered.",
+            "invalid_key": "API key not accepted.",
+            "invalid_email": "eMail address is not valid."
+        },
+        "abort": {
+            "already_configured": "Already configured and only a single instance is allowed."
+        }
+    },
+    "options": {
+        "step": {
+            "user": {
+                "title": "Person Location Options",
+                "data": {
+                    "extended_away": "Hours Extended Away",
+                    "just_arrived": "Minutes Just Arrived",
+                    "just_left": "Minutes Just Left",
+                    "review_update_configuration": "Review/Update Base Configuration?"
+                }
+            }
+        }
+    }
+}

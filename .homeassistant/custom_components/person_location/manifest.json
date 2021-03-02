@@ -1,12 +1,14 @@
 {
   "domain": "person_location",
   "name": "Person Location",
-  "documentation": "https://github.com/rodpayne/home-assistant",
+  "documentation": "https://github.com/rodpayne/home-assistant/blob/master/docs/PersonDetection_person_location.md#table-of-contents",
+  "issue_tracker": "https://github.com/rodpayne/home-assistant/issues",
   "dependencies": [
     "device_tracker",
     "sensor",
     "zone"
   ],
+  "config_flow": true,
   "codeowners": [
     "@rodpayne"
   ],
@@ -15,5 +17,5 @@
     "integrationhelper",
     "voluptuous"
   ],
-  "version": "2021.02.23"
+  "version": "2021.03.01"
 }

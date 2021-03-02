@@ -16,17 +16,15 @@ import traceback
 from datetime import datetime, timedelta, timezone
 from functools import partial
 
-from homeassistant.helpers.event import (
-    track_point_in_time,
-)
-
 import WazeRouteCalculator
-
 from homeassistant.components.device_tracker.const import (
-    DOMAIN as DEVICE_TRACKER_DOMAIN,
     ATTR_SOURCE_TYPE,
     SOURCE_TYPE_GPS,
 )
+from homeassistant.components.device_tracker.const import (
+    DOMAIN as DEVICE_TRACKER_DOMAIN,
+)
+from homeassistant.components.mobile_app.const import ATTR_VERTICAL_ACCURACY
 from homeassistant.const import (
     ATTR_ATTRIBUTION,
     ATTR_GPS_ACCURACY,
@@ -35,17 +33,38 @@ from homeassistant.const import (
     CONF_ENTITY_ID,
     CONF_FRIENDLY_NAME_TEMPLATE,
 )
+from homeassistant.exceptions import ServiceNotFound
+from homeassistant.helpers.event import track_point_in_time
 from homeassistant.util.location import distance
 from requests import get
 
 from .const import (
     API_STATE_OBJECT,
+    ATTR_ALTITUDE,
     ATTR_BREAD_CRUMBS,
+    ATTR_DRIVING_MILES,
+    ATTR_DRIVING_MINUTES,
+    ATTR_GEOCODED,
+    ATTR_METERS_FROM_HOME,
+    ATTR_MILES_FROM_HOME,
+    CONF_CREATE_SENSORS,
+    CONF_GOOGLE_API_KEY,
+    CONF_HOURS_EXTENDED_AWAY,
+    CONF_LANGUAGE,
+    CONF_MAPQUEST_API_KEY,
+    CONF_MINUTES_JUST_ARRIVED,
+    CONF_MINUTES_JUST_LEFT,
+    CONF_OSM_API_KEY,
+    CONF_REGION,
+    DATA_ASYNC_SETUP_ENTRY,
+    DATA_CONFIG_ENTRY,
+    DATA_CONFIGURATION,
+    DATA_UNDO_UPDATE_LISTENER,
     DEFAULT_API_KEY_NOT_SET,
     DOMAIN,
     METERS_PER_KM,
     METERS_PER_MILE,
-    MIN_DISTANCE_TRAVELLED,
+    MIN_DISTANCE_TRAVELLED_TO_GEOCODE,
     PERSON_LOCATION_ENTITY,
     PERSON_LOCATION_INTEGRATION,
     THROTTLE_INTERVAL,
@@ -58,6 +77,8 @@ _LOGGER = logging.getLogger(__name__)
 
 def setup(hass, config):
     """Setup is called by Home Assistant to load our integration."""
+
+    _LOGGER.debug("[setup] === Start ===")
 
     pli = PERSON_LOCATION_INTEGRATION(API_STATE_OBJECT, hass, config)
     integration_lock = threading.Lock()
@@ -73,9 +94,11 @@ def setup(hass, config):
         )
         try:
             hass.services.call("rest_command", rest_command)
-        except Exception as e:
+        except ServiceNotFound as e:
             _LOGGER.debug(
-                "call_rest_command_service" + " %s exception - %s", rest_command, str(e)
+                "call_rest_command_service Exception %s = %s",
+                type(e).__name__,
+                str(e),
             )
 
     def handle_delayed_state_change(
@@ -85,7 +108,7 @@ def setup(hass, config):
 
         _LOGGER.debug(
             "[handle_delayed_state_change]"
-            + " (%s) === Start: from_state = %s; to_state = %s"
+            + " (%s) === Start === from_state = %s; to_state = %s"
             % (entity_id, from_state, to_state)
         )
 
@@ -123,7 +146,7 @@ def setup(hass, config):
                         target.entity_id,
                         "Away",
                         "Extended Away",
-                        pli.configured_minutes_extended_away,
+                        (pli.configuration[CONF_HOURS_EXTENDED_AWAY] * 60),
                     )
                     pass
                 elif to_state == "Extended Away":
@@ -132,12 +155,13 @@ def setup(hass, config):
                 call_rest_command_service(target.personName, to_state)
                 target.set_state()
         _LOGGER.debug(
-            "[handle_delayed_state_change]" + " (%s) === Finish." % (entity_id)
+            "[handle_delayed_state_change]" + " (%s) === Return ===" % (entity_id)
         )
 
     def change_state_later(entity_id, from_state, to_state, minutes=3):
         """Set timer to handle the delayed state change."""
 
+        _LOGGER.debug("[change_state_later]" + " (%s) === Start ===" % (entity_id))
         point_in_time = datetime.now() + timedelta(minutes=minutes)
         remove = track_point_in_time(
             hass,
@@ -156,6 +180,7 @@ def setup(hass, config):
                 + " (%s) handle_delayed_state_change(, %s, %s, %d) has been scheduled"
                 % (entity_id, from_state, to_state, minutes)
             )
+        _LOGGER.debug("[change_state_later]" + " (%s) === Return ===" % (entity_id))
 
     def handle_process_trigger(call):
         """
@@ -201,7 +226,7 @@ def setup(hass, config):
 
         _LOGGER.debug(
             "[handle_process_trigger]"
-            + " (%s) ===== Start: from_state = %s; to_state = %s",
+            + " (%s) === Start === from_state = %s; to_state = %s",
             trigger.entity_id,
             triggerFrom,
             triggerTo,
@@ -216,12 +241,12 @@ def setup(hass, config):
             )
         else:
 
-            # -----------------------------------------------------------------------------
+            # ---------------------------------------------------------
             # Get the current state of the target person location
             # sensor and decide if it should be updated with values
             # from the triggered device tracker:
             saveThisUpdate = False
-            # -----------------------------------------------------------------------------
+            # ---------------------------------------------------------
 
             if ATTR_SOURCE_TYPE in trigger.attributes:
                 triggerSourceType = trigger.attributes[ATTR_SOURCE_TYPE]
@@ -233,9 +258,9 @@ def setup(hass, config):
                 _LOGGER.debug("[handle_process_trigger]" + " target_lock obtained")
                 target = PERSON_LOCATION_ENTITY(trigger.targetName, hass)
 
-                if "location_update_time" in target.sensor_info:
+                if "location_update_time" in target.entity_sensor_info:
                     old_update_time = datetime.strptime(
-                        target.sensor_info["location_update_time"],
+                        target.entity_sensor_info["location_update_time"],
                         "%Y-%m-%d %H:%M:%S.%f",
                     )
 
@@ -285,12 +310,15 @@ def setup(hass, config):
                             elif (
                                 trigger.state == target.attributes["reported_state"]
                             ):  # same status as the one we are following?
-                                if "vertical_accuracy" in trigger.attributes:
+                                if ATTR_VERTICAL_ACCURACY in trigger.attributes:
                                     if (
-                                        not ("vertical_accuracy" in target.attributes)
+                                        not (
+                                            ATTR_VERTICAL_ACCURACY in target.attributes
+                                        )
                                     ) or (
-                                        trigger.attributes["vertical_accuracy"] > 0
-                                        and target.attributes["vertical_accuracy"] == 0
+                                        trigger.attributes[ATTR_VERTICAL_ACCURACY] > 0
+                                        and target.attributes[ATTR_VERTICAL_ACCURACY]
+                                        == 0
                                     ):  # better choice based on accuracy?
                                         saveThisUpdate = True
                                         _LOGGER.debug(
@@ -333,7 +361,7 @@ def setup(hass, config):
                                         trigger.entity_id,
                                     )
 
-                # -----------------------------------------------------------------------
+                # -----------------------------------------------------
 
                 if saveThisUpdate == False:
                     _LOGGER.debug(
@@ -352,16 +380,20 @@ def setup(hass, config):
                             target.attributes.pop(ATTR_SOURCE_TYPE)
 
                     if (
-                        "latitude" in trigger.attributes
-                        and "longitude" in trigger.attributes
+                        ATTR_LATITUDE in trigger.attributes
+                        and ATTR_LONGITUDE in trigger.attributes
                     ):
-                        target.attributes["latitude"] = trigger.attributes["latitude"]
-                        target.attributes["longitude"] = trigger.attributes["longitude"]
+                        target.attributes[ATTR_LATITUDE] = trigger.attributes[
+                            ATTR_LATITUDE
+                        ]
+                        target.attributes[ATTR_LONGITUDE] = trigger.attributes[
+                            ATTR_LONGITUDE
+                        ]
                     else:
-                        if "latitude" in target.attributes:
-                            target.attributes.pop("latitude")
-                        if "longitude" in target.attributes:
-                            target.attributes.pop("longitude")
+                        if ATTR_LATITUDE in target.attributes:
+                            target.attributes.pop(ATTR_LATITUDE)
+                        if ATTR_LONGITUDE in target.attributes:
+                            target.attributes.pop(ATTR_LONGITUDE)
 
                     if ATTR_GPS_ACCURACY in trigger.attributes:
                         target.attributes[ATTR_GPS_ACCURACY] = trigger.attributes[
@@ -371,21 +403,21 @@ def setup(hass, config):
                         if ATTR_GPS_ACCURACY in target.attributes:
                             target.attributes.pop(ATTR_GPS_ACCURACY)
 
-                    if "altitude" in trigger.attributes:
-                        target.attributes["altitude"] = round(
-                            trigger.attributes["altitude"]
+                    if ATTR_ALTITUDE in trigger.attributes:
+                        target.attributes[ATTR_ALTITUDE] = round(
+                            trigger.attributes[ATTR_ALTITUDE]
                         )
                     else:
-                        if "altitude" in target.attributes:
-                            target.attributes.pop("altitude")
+                        if ATTR_ALTITUDE in target.attributes:
+                            target.attributes.pop(ATTR_ALTITUDE)
 
-                    if "vertical_accuracy" in trigger.attributes:
-                        target.attributes["vertical_accuracy"] = trigger.attributes[
-                            "vertical_accuracy"
+                    if ATTR_VERTICAL_ACCURACY in trigger.attributes:
+                        target.attributes[ATTR_VERTICAL_ACCURACY] = trigger.attributes[
+                            ATTR_VERTICAL_ACCURACY
                         ]
                     else:
-                        if "vertical_accuracy" in target.attributes:
-                            target.attributes.pop("vertical_accuracy")
+                        if ATTR_VERTICAL_ACCURACY in target.attributes:
+                            target.attributes.pop(ATTR_VERTICAL_ACCURACY)
 
                     target.attributes["source"] = trigger.entity_id
                     target.attributes["reported_state"] = trigger.state
@@ -423,6 +455,8 @@ def setup(hass, config):
                             reportedZone = (
                                 trigger.stateHomeAway.lower()
                             )  # clean up the odd "zones"
+                            template = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is in <locality>"
+
                     target.attributes["icon"] = icon
                     target.attributes["zone"] = reportedZone
                     _LOGGER.debug(
@@ -442,8 +476,10 @@ def setup(hass, config):
                         )
 
                     if reportedZone == "home":
-                        target.attributes["latitude"] = pli.attributes["home_latitude"]
-                        target.attributes["longitude"] = pli.attributes[
+                        target.attributes[ATTR_LATITUDE] = pli.attributes[
+                            "home_latitude"
+                        ]
+                        target.attributes[ATTR_LONGITUDE] = pli.attributes[
                             "home_longitude"
                         ]
 
@@ -470,7 +506,7 @@ def setup(hass, config):
                                 target.entity_id,
                                 newTargetState,
                                 "Home",
-                                pli.configured_minutes_just_arrived,
+                                pli.configuration[CONF_MINUTES_JUST_ARRIVED],
                             )
                             call_rest_command_service(
                                 trigger.personName, newTargetState
@@ -482,7 +518,7 @@ def setup(hass, config):
                                 target.entity_id,
                                 "Away",
                                 "Extended Away",
-                                pli.configured_minutes_extended_away,
+                                (pli.configuration[CONF_HOURS_EXTENDED_AWAY] * 60),
                             )
                             call_rest_command_service(
                                 trigger.personName, newTargetState
@@ -497,7 +533,7 @@ def setup(hass, config):
                                 target.entity_id,
                                 newTargetState,
                                 "Away",
-                                pli.configured_minutes_just_left,
+                                pli.configuration[CONF_MINUTES_JUST_LEFT],
                             )
                             call_rest_command_service(
                                 trigger.personName, newTargetState
@@ -536,12 +572,12 @@ def setup(hass, config):
                             "force_update": force_update,
                         }
                         hass.services.call(
-                            "person_location", "reverse_geocode", service_data, False
+                            DOMAIN, "reverse_geocode", service_data, False
                         )
 
                 _LOGGER.debug("[handle_process_trigger]" + " target_lock release...")
         _LOGGER.debug(
-            "[handle_process_trigger]" + " (%s) === Finish.",
+            "[handle_process_trigger]" + " (%s) === Return ===",
             trigger.entity_id,
         )
 
@@ -581,7 +617,7 @@ def setup(hass, config):
 
         _LOGGER.debug(
             "[handle_reverse_geocode]"
-            + " (%s) === Start: %s = %s; %s = %s"
+            + " (%s) === Start === %s = %s; %s = %s"
             % (
                 entity_id,
                 CONF_FRIENDLY_NAME_TEMPLATE,
@@ -669,12 +705,16 @@ def setup(hass, config):
                         else:
                             new_longitude = "None"
 
-                        if "location_latitude" in target.sensor_info:
-                            old_latitude = target.sensor_info["location_latitude"]
+                        if "location_latitude" in target.entity_sensor_info:
+                            old_latitude = target.entity_sensor_info[
+                                "location_latitude"
+                            ]
                         else:
                             old_latitude = "None"
-                        if "location_longitude" in target.sensor_info:
-                            old_longitude = target.sensor_info["location_longitude"]
+                        if "location_longitude" in target.entity_sensor_info:
+                            old_longitude = target.entity_sensor_info[
+                                "location_longitude"
+                            ]
                         else:
                             old_longitude = "None"
 
@@ -729,7 +769,7 @@ def setup(hass, config):
                                 + ") Skipping geocoding because coordinates are missing"
                             )
                         elif (
-                            distance_traveled < MIN_DISTANCE_TRAVELLED
+                            distance_traveled < MIN_DISTANCE_TRAVELLED_TO_GEOCODE
                             and old_latitude != "None"
                             and old_longitude != "None"
                             and force_update == False
@@ -739,7 +779,7 @@ def setup(hass, config):
                                 + " ("
                                 + entity_id
                                 + ") Skipping geocoding because distance_traveled < "
-                                + str(MIN_DISTANCE_TRAVELLED)
+                                + str(MIN_DISTANCE_TRAVELLED_TO_GEOCODE)
                             )
                         else:
                             locality = "?"
@@ -759,9 +799,9 @@ def setup(hass, config):
                             else:
                                 new_update_time = currentApiTime
 
-                            if "location_update_time" in target.sensor_info:
+                            if "location_update_time" in target.entity_sensor_info:
                                 old_update_time = datetime.strptime(
-                                    target.sensor_info["location_update_time"],
+                                    target.entity_sensor_info["location_update_time"],
                                     "%Y-%m-%d %H:%M:%S.%f",
                                 )
                                 _LOGGER.debug(
@@ -838,10 +878,10 @@ def setup(hass, config):
                                 + ") meters_from_home = "
                                 + str(distance_from_home)
                             )
-                            target.attributes["meters_from_home"] = round(
+                            target.attributes[ATTR_METERS_FROM_HOME] = round(
                                 distance_from_home, 1
                             )
-                            target.attributes["miles_from_home"] = round(
+                            target.attributes[ATTR_MILES_FROM_HOME] = round(
                                 distance_from_home / METERS_PER_MILE, 1
                             )
 
@@ -862,10 +902,13 @@ def setup(hass, config):
                             )
                             target.attributes["direction"] = direction
 
-                            if pli.configured_osm_api_key != DEFAULT_API_KEY_NOT_SET:
-                                """Call the Open Street Map (Nominatim) API if osm_api_key is configured"""
+                            if (
+                                pli.configuration[CONF_OSM_API_KEY]
+                                != DEFAULT_API_KEY_NOT_SET
+                            ):
+                                """Call the Open Street Map (Nominatim) API if CONF_OSM_API_KEY is configured"""
                                 if (
-                                    pli.configured_osm_api_key
+                                    pli.configuration[CONF_OSM_API_KEY]
                                     == DEFAULT_API_KEY_NOT_SET
                                 ):
                                     osm_url = (
@@ -882,7 +925,7 @@ def setup(hass, config):
                                         + "&lon="
                                         + str(new_longitude)
                                         + "&addressdetails=1&namedetails=1&zoom=18&limit=1&email="
-                                        + pli.configured_osm_api_key
+                                        + pli.configuration[CONF_OSM_API_KEY]
                                     )
 
                                 osm_decoded = {}
@@ -934,12 +977,15 @@ def setup(hass, config):
                                 else:
                                     osm_attribution = ""
 
-                                if "geocoded" in pli.create_sensors:
+                                if (
+                                    ATTR_GEOCODED
+                                    in pli.configuration[CONF_CREATE_SENSORS]
+                                ):
                                     target.make_template_sensor(
                                         "Open_Street_Map",
                                         [
-                                            "latitude",
-                                            "longitude",
+                                            ATTR_LATITUDE,
+                                            ATTR_LONGITUDE,
                                             ATTR_SOURCE_TYPE,
                                             ATTR_GPS_ACCURACY,
                                             "icon",
@@ -948,20 +994,23 @@ def setup(hass, config):
                                         ],
                                     )
 
-                            if pli.configured_google_api_key != DEFAULT_API_KEY_NOT_SET:
-                                """Call the Google Maps Reverse Geocoding API if google_api_key is configured"""
+                            if (
+                                pli.configuration[CONF_GOOGLE_API_KEY]
+                                != DEFAULT_API_KEY_NOT_SET
+                            ):
+                                """Call the Google Maps Reverse Geocoding API if CONF_GOOGLE_API_KEY is configured"""
                                 """https://developers.google.com/maps/documentation/geocoding/overview?hl=en_US#ReverseGeocoding"""
                                 google_url = (
                                     "https://maps.googleapis.com/maps/api/geocode/json?language="
-                                    + pli.configured_language
+                                    + pli.configuration[CONF_LANGUAGE]
                                     + "&region="
-                                    + pli.configured_google_region
+                                    + pli.configuration[CONF_REGION]
                                     + "&latlng="
                                     + str(new_latitude)
                                     + ","
                                     + str(new_longitude)
                                     + "&key="
-                                    + pli.configured_google_api_key
+                                    + pli.configuration[CONF_GOOGLE_API_KEY]
                                 )
                                 google_decoded = {}
                                 #            _LOGGER.debug( "(" + entity_id + ") url - " + google_url)
@@ -1013,12 +1062,15 @@ def setup(hass, config):
                                         google_attribution = '"powered by Google"'
                                         attribution += google_attribution + "; "
 
-                                        if "geocoded" in pli.create_sensors:
+                                        if (
+                                            ATTR_GEOCODED
+                                            in pli.configuration[CONF_CREATE_SENSORS]
+                                        ):
                                             target.make_template_sensor(
                                                 "Google_Maps",
                                                 [
-                                                    "latitude",
-                                                    "longitude",
+                                                    ATTR_LATITUDE,
+                                                    ATTR_LONGITUDE,
                                                     ATTR_SOURCE_TYPE,
                                                     ATTR_GPS_ACCURACY,
                                                     "icon",
@@ -1030,10 +1082,10 @@ def setup(hass, config):
                                             )
 
                             if (
-                                pli.configured_mapquest_api_key
+                                pli.configuration[CONF_MAPQUEST_API_KEY]
                                 != DEFAULT_API_KEY_NOT_SET
                             ):
-                                """Call the Mapquest Reverse Geocoding API if mapquest_api_key is configured"""
+                                """Call the Mapquest Reverse Geocoding API if CONF_MAPQUEST_API_KEY is configured"""
                                 """https://developer.mapquest.com/documentation/geocoding-api/reverse/get/"""
                                 mapquest_url = (
                                     "https://www.mapquestapi.com/geocoding/v1/reverse"
@@ -1043,7 +1095,7 @@ def setup(hass, config):
                                     + str(new_longitude)
                                     + "&thumbMaps=false"
                                     + "&key="
-                                    + pli.configured_mapquest_api_key
+                                    + pli.configuration[CONF_MAPQUEST_API_KEY]
                                 )
                                 mapquest_decoded = {}
                                 mapquest_response = get(mapquest_url)
@@ -1141,12 +1193,15 @@ def setup(hass, config):
                                         )
                                         attribution += mapquest_attribution + "; "
 
-                                        if "geocoded" in pli.create_sensors:
+                                        if (
+                                            ATTR_GEOCODED
+                                            in pli.configuration[CONF_CREATE_SENSORS]
+                                        ):
                                             target.make_template_sensor(
                                                 "MapQuest",
                                                 [
-                                                    "latitude",
-                                                    "longitude",
+                                                    ATTR_LATITUDE,
+                                                    ATTR_LONGITUDE,
                                                     ATTR_SOURCE_TYPE,
                                                     ATTR_GPS_ACCURACY,
                                                     "icon",
@@ -1161,9 +1216,13 @@ def setup(hass, config):
                                 target.attributes["friendly_name"] = template.replace(
                                     "<locality>", locality
                                 )
-                            target.sensor_info["location_latitude"] = new_latitude
-                            target.sensor_info["location_longitude"] = new_longitude
-                            target.sensor_info["location_update_time"] = str(
+                            target.entity_sensor_info[
+                                "location_latitude"
+                            ] = new_latitude
+                            target.entity_sensor_info[
+                                "location_longitude"
+                            ] = new_longitude
+                            target.entity_sensor_info["location_update_time"] = str(
                                 new_update_time
                             )
                             if "reported_state" in target.attributes:
@@ -1183,14 +1242,14 @@ def setup(hass, config):
                                 target.attributes[ATTR_BREAD_CRUMBS] = newBreadCrumb
 
                             # Call WazeRouteCalculator if not at Home:
-                            if pli.use_waze == False:
+                            if pli.configuration["use_waze"] == False:
                                 pass
                             elif (
-                                target.attributes["meters_from_home"]
+                                target.attributes[ATTR_METERS_FROM_HOME]
                                 < WAZE_MIN_METERS_FROM_HOME
                             ):
-                                target.attributes["driving_miles"] = "0"
-                                target.attributes["driving_minutes"] = "0"
+                                target.attributes[ATTR_DRIVING_MILES] = "0"
+                                target.attributes[ATTR_DRIVING_MINUTES] = "0"
                             else:
                                 try:
                                     """
@@ -1216,7 +1275,7 @@ def setup(hass, config):
                                     route = WazeRouteCalculator.WazeRouteCalculator(
                                         from_location,
                                         to_location,
-                                        pli.configured_waze_region,
+                                        pli.configuration["waze_region"],
                                         avoid_toll_roads=True,
                                     )
                                     routeTime, routeDistance = route.calc_route_info()
@@ -1231,15 +1290,15 @@ def setup(hass, config):
                                         routeDistance * METERS_PER_KM / METERS_PER_MILE
                                     )  # miles
                                     if routeDistance >= 100:
-                                        target.attributes["driving_miles"] = str(
+                                        target.attributes[ATTR_DRIVING_MILES] = str(
                                             round(routeDistance, 0)
                                         )
                                     elif routeDistance >= 10:
-                                        target.attributes["driving_miles"] = str(
+                                        target.attributes[ATTR_DRIVING_MILES] = str(
                                             round(routeDistance, 1)
                                         )
                                     else:
-                                        target.attributes["driving_miles"] = str(
+                                        target.attributes[ATTR_DRIVING_MILES] = str(
                                             round(routeDistance, 2)
                                         )
                                     _LOGGER.debug(
@@ -1249,7 +1308,7 @@ def setup(hass, config):
                                         + ") Waze routeTime "
                                         + str(routeTime)
                                     )  # minutes
-                                    target.attributes["driving_minutes"] = str(
+                                    target.attributes[ATTR_DRIVING_MINUTES] = str(
                                         round(routeTime, 1)
                                     )
                                     attribution += (
@@ -1260,13 +1319,15 @@ def setup(hass, config):
                                         "[handle_reverse_geocode]"
                                         + " ("
                                         + entity_id
-                                        + ") Waze Exception - "
+                                        + ") Waze Exception "
+                                        + type(e).__name__
+                                        + ": "
                                         + str(e)
                                     )
                                     _LOGGER.debug(traceback.format_exc())
                                     pli.attributes["waze_error_count"] += 1
-                                    target.attributes.pop("driving_miles")
-                                    target.attributes.pop("driving_minutes")
+                                    target.attributes.pop(ATTR_DRIVING_MILES)
+                                    target.attributes.pop(ATTR_DRIVING_MINUTES)
 
                         target.attributes[ATTR_ATTRIBUTION] = attribution
 
@@ -1280,19 +1341,19 @@ def setup(hass, config):
             except Exception as e:
                 _LOGGER.error(
                     "[handle_reverse_geocode]"
-                    + " (%s) Exception - %s" % (entity_id, str(e))
+                    + " (%s) Exception %s: %s" % (entity_id, type(e).__name__, str(e))
                 )
                 _LOGGER.debug(traceback.format_exc())
                 pli.attributes["api_error_count"] += 1
 
             pli.set_state()
             _LOGGER.debug("[handle_reverse_geocode]" + " integration_lock release...")
-        _LOGGER.debug("[handle_reverse_geocode] === Finish.")
+        _LOGGER.debug("[handle_reverse_geocode] (%s) === Return ===", entity_id)
 
     def handle_geocode_api_on(call):
         """Turn on the geocode service."""
 
-        _LOGGER.debug("[geocode_api_on] === Start.")
+        _LOGGER.debug("[geocode_api_on] === Start===")
         with integration_lock:
             """Lock while updating the pli(API_STATE_OBJECT)."""
             _LOGGER.debug("[handle_geocode_api_on]" + " integration_lock obtained")
@@ -1302,12 +1363,12 @@ def setup(hass, config):
             pli.attributes["icon"] = "mdi:api"
             pli.set_state()
             _LOGGER.debug("[geocode_api_on]" + " integration_lock release...")
-        _LOGGER.debug("[geocode_api_on] === Finish.")
+        _LOGGER.debug("[geocode_api_on] === Return ===")
 
     def handle_geocode_api_off(call):
         """Turn off the geocode service. """
 
-        _LOGGER.debug("[geocode_api_off] === Start.")
+        _LOGGER.debug("[geocode_api_off] === Start ===")
         with integration_lock:
             """Lock while updating the pli(API_STATE_OBJECT)."""
             _LOGGER.debug("[handle_geocode_api_off]" + " integration_lock obtained")
@@ -1317,7 +1378,26 @@ def setup(hass, config):
             pli.attributes["icon"] = "mdi:api-off"
             pli.set_state()
             _LOGGER.debug("[handle_geocode_api_off]" + " integration_lock release...")
-        _LOGGER.debug("[geocode_api_off] === Finish.")
+        _LOGGER.debug("[geocode_api_off] === Return ===")
+
+    async def async_setup_entry(hass, entry):
+        """Process config_flow configuration and options."""
+
+        _LOGGER.debug(
+            "[async_setup_entry] === Start === -data: %s -options: %s",
+            entry.data,
+            entry.options,
+        )
+
+        pli.configuration.update(entry.data)
+        pli.configuration.update(entry.options)
+
+        hass.data[DOMAIN][DATA_CONFIGURATION] = pli.configuration
+
+        _LOGGER.debug("[async_setup_entry] === Return ===")
+        return True
+
+    hass.data[DOMAIN][DATA_ASYNC_SETUP_ENTRY] = async_setup_entry
 
     hass.services.register(DOMAIN, "reverse_geocode", handle_reverse_geocode)
     hass.services.register(DOMAIN, "geocode_api_on", handle_geocode_api_on)
@@ -1326,5 +1406,41 @@ def setup(hass, config):
 
     pli.set_state()
 
+    _LOGGER.debug("[setup] === Return ===")
     # Return boolean to indicate that setup was successful.
+    return True
+
+
+# ------------------------------------------------------------------
+
+
+async def async_setup_entry(hass, entry):
+    """Accept conf_flow configuration."""
+
+    hass.data[DOMAIN][DATA_CONFIG_ENTRY] = entry
+
+    if DATA_UNDO_UPDATE_LISTENER not in hass.data[DOMAIN]:
+        hass.data[DOMAIN][DATA_UNDO_UPDATE_LISTENER] = entry.add_update_listener(
+            async_options_update_listener
+        )
+
+    return await hass.data[DOMAIN][DATA_ASYNC_SETUP_ENTRY](hass, entry)
+
+
+async def async_options_update_listener(hass, entry):
+    """Accept conf_flow options."""
+
+    return await hass.data[DOMAIN][DATA_ASYNC_SETUP_ENTRY](hass, entry)
+
+
+async def async_unload_entry(hass, entry):
+    """Unload a config entry."""
+
+    _LOGGER.debug("===== async_unload_entry")
+    if DATA_UNDO_UPDATE_LISTENER in hass.data[DOMAIN]:
+        hass.data[DOMAIN][DATA_UNDO_UPDATE_LISTENER]()
+
+    hass.data[DOMAIN].pop(DATA_UNDO_UPDATE_LISTENER)
+    hass.data[DOMAIN].pop(DATA_CONFIG_ENTRY)
+
     return True
