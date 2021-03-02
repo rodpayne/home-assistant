@@ -70,10 +70,8 @@ class PersonLocation_aiohttp_Client:
             _LOGGER.error(error_message)
             return {"error": error_message}
 
-        except Exception as exception:  # pylint: disable=broad-except
-            error_message = (
-                f"Something wrong happened! - {type(e).__name__}: {exception}"
-            )
+        except Exception as e:  # pylint: disable=broad-except
+            error_message = f"Something wrong happened! - {type(e).__name__}: {e}"
             _LOGGER.error(error_message)
             _LOGGER.debug(traceback.format_exc())
             return {"error": error_message}

@@ -364,8 +364,8 @@ class PERSON_LOCATION_ENTITY:
             else:
                 return
         elif type(attributeName) is dict:
-            templateSuffix = keys(attributeName)[0]
-            templateState = attributeName[templateSuffix]
+            for templateSuffix in attributeName:
+                templateState = attributeName[templateSuffix]
 
         templateAttributes = {}
         for supplementalAttribute in supplementalAttributeArray:
