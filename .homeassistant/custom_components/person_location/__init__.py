@@ -191,8 +191,6 @@ def setup(hass, config):
                 entity_id
                 from_state
                 to_state
-            - Automation.ha_just_started:
-                on for a few minutes so that "Just Arrived" and "Just Left" don't get set at startup
         Output (if update is accepted):
             - Updated "sensor.<personName>_location" with <personName>'s location and status:
                 Attributes:
@@ -422,17 +420,14 @@ def setup(hass, config):
                     )
                     target.attributes["update_time"] = str(datetime.now())
 
-                    # Format new friendly_name and the template to be updated by geocoding:
+                    # Determine the zone and the icon to be used:
 
-                    if trigger.state == "Away" or trigger.state.lower() == "on":
-                        friendly_name = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is {trigger.state}"
-                        template = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is in <locality>"
+                    if trigger.state.lower() in ["away", "on", "not_home"]:
+                        friendly_name_location = "Away"
+                    elif trigger.state == "Home":
+                        friendly_name_location = "Home"
                     else:
-                        friendly_name = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is at {trigger.state}"
-                        template = friendly_name
-                    target.attributes["friendly_name"] = friendly_name
-
-                    # Determine the zone and the icon to be used based on the zone:
+                        friendly_name_location = trigger.state
 
                     if "zone" in trigger.attributes:
                         reportedZone = trigger.attributes["zone"]
@@ -442,34 +437,46 @@ def setup(hass, config):
                         )
                     zoneEntityID = "zone." + reportedZone
                     zoneStateObject = hass.states.get(zoneEntityID)
+                    icon = "mdi:help-circle"
                     if zoneStateObject != None:
                         zoneAttributesObject = zoneStateObject.attributes.copy()
-                        icon = zoneAttributesObject["icon"]
+                        if "friendly_name" in zoneAttributesObject:
+                            friendly_name_location = zoneAttributesObject[
+                                "friendly_name"
+                            ]
+                        if "icon" in zoneAttributesObject:
+                            icon = zoneAttributesObject["icon"]
                     else:
-                        icon = "mdi:help-circle"
-                        if reportedZone != "home":  # (zone.home may not be defined)
-                            reportedZone = (
-                                trigger.stateHomeAway.lower()
-                            )  # clean up the odd "zones"
-                            template = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is in <locality>"
+                        # Eliminate stray zone names:
+                        friendly_name_location = "Away"
 
                     target.attributes["icon"] = icon
                     target.attributes["zone"] = reportedZone
+
                     _LOGGER.debug(
-                        "[handle_process_trigger]" + " zone = %s; icon = %s",
+                        "[handle_process_trigger]"
+                        + " zone = %s; icon = %s; friendly_name_location = %s",
                         reportedZone,
                         target.attributes["icon"],
+                        friendly_name_location,
                     )
 
-                    ha_just_startedObject = hass.states.get(
-                        "automation.ha_just_started"
-                    )
-                    ha_just_started = ha_just_startedObject.state
-                    if ha_just_started == "on":
-                        _LOGGER.debug(
-                            "[handle_process_trigger]" + " ha_just_started = %s",
-                            ha_just_started,
-                        )
+                    # Format new friendly_name and the template to be updated by geocoding:
+
+                    if (
+                        friendly_name_location == "Away"
+                    ):  # "... is Away"; add locality in geocoding
+                        friendly_name = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is {friendly_name_location}"
+                        template = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is in <locality>"
+                    else:  # "... is at <name>"; don't add locality
+                        friendly_name = f"{string.capwords(trigger.personName)} ({trigger.friendlyName}) is at {friendly_name_location}"
+                        template = friendly_name
+
+                    target.attributes["friendly_name"] = friendly_name
+
+                    ha_just_started = pli.attributes["startup"]
+                    if ha_just_started:
+                        _LOGGER.debug("HA just started flag is on")
 
                     if reportedZone == "home":
                         target.attributes[ATTR_LATITUDE] = pli.attributes[
@@ -485,7 +492,7 @@ def setup(hass, config):
                     if trigger.stateHomeAway == "Home":
                         if (
                             oldTargetState == "none"
-                            or ha_just_started == "on"
+                            or ha_just_started
                             or oldTargetState == "just left"
                         ):
                             newTargetState = "Home"
@@ -508,7 +515,7 @@ def setup(hass, config):
                                 trigger.personName, newTargetState
                             )
                     else:
-                        if oldTargetState == "none" or ha_just_started == "on":
+                        if oldTargetState == "none" or ha_just_started:
                             newTargetState = "Away"
                             change_state_later(
                                 target.entity_id,
@@ -540,7 +547,7 @@ def setup(hass, config):
                                 trigger.personName, newTargetState
                             )
 
-                    if ha_just_started == "on":
+                    if ha_just_started:
                         target.attributes[ATTR_BREAD_CRUMBS] = newTargetState
 
                     target.state = newTargetState
@@ -559,7 +566,7 @@ def setup(hass, config):
                         force_update = False
                     if (
                         newTargetState != "Home"
-                        or ha_just_started == "on"
+                        or ha_just_started
                         or force_update == True
                     ):
                         service_data = {
@@ -1400,6 +1407,34 @@ def setup(hass, config):
     hass.services.register(DOMAIN, "geocode_api_on", handle_geocode_api_on)
     hass.services.register(DOMAIN, "geocode_api_off", handle_geocode_api_off)
     hass.services.register(DOMAIN, "process_trigger", handle_process_trigger)
+
+    # Set a timer for when to stop ignoring stuff during startup:
+
+    def handle_startup_is_done(now):
+        """Handle timer for startup is done."""
+
+        hass_state = pli.hass.state
+        _LOGGER.debug("[handle_startup_is_done] hass.state = %s", hass_state)
+
+        #    if hass_state == "STARTING":
+        #        set_timer_check_startup_is_done()
+        #        return
+
+        pli.attributes["startup"] = False
+        _LOGGER.debug("[handle_startup_is_done] HA just started flag is now turned off")
+
+    def set_timer_check_startup_is_done():
+        pli.attributes["startup"] = True
+        point_in_time = datetime.now() + timedelta(minutes=3)
+        remove = track_point_in_time(
+            hass,
+            partial(
+                handle_startup_is_done,
+            ),
+            point_in_time=point_in_time,
+        )
+
+    set_timer_check_startup_is_done()
 
     pli.set_state()
 

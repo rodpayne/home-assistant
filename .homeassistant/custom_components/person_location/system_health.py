@@ -68,6 +68,11 @@ async def system_health_info(hass):
             return_info["WAZE Error Count"] = attr_value
 
         for sensor in sensor_info:
-            return_info[sensor] = sensor_info[sensor]["geocode_count"]
+            return_info[sensor] = (
+                str(sensor_info[sensor]["geocode_count"])
+                + " geolocated out of "
+                + str(sensor_info[sensor]["trigger_count"])
+                + " triggers"
+            )
 
     return return_info
