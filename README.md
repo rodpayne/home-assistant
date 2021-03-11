@@ -14,15 +14,19 @@ Excellent documentation and HACS installation available from (https://github.com
 
 4. Restart Home Assistant.
 
-## **Person Location Sensor**
-This custom integration will look at all device trackers for a particular person and combine them into a single person location sensor, `sensor.<name>_location`. Device tracker state change events are monitored rather than polling, making a composite, averaging the states, or calculating a probability.
+## **Person Location Custom Integration**
 
-When the person location sensor changes it can be reverse geocoded using Open Street Maps or Google Maps and the distance from home (miles and minutes) calculated with `WazeRouteCalculator`.
+![Sample person location](docs/images/SamplePersonLocation.png)
 
+This custom integration has been moved to its own HACS-compatible repository.
+
+### **Combine the status of multiple device trackers**
+This custom integration will look at all device trackers for a particular person and combine them into a single person location sensor, `sensor.<name>_location`. Device tracker state change events are monitored rather than being polled, making a composite, averaging the states, or calculating a probability.
+
+### **Make presence detection not so binary**
 When a person is detected as moving between `Home` and `Away`, instead of going straight to `Home` or `Away`, this will temporarily set the person's location state to `Just Arrived` or `Just Left` so that automations can be triggered appropriately.
 
-![Person Location State Diagram](docs/images/PersonHomeState.png)
+### **Reverse geocode the location and make distance calculations**
+When the person location sensor changes it can be reverse geocoded using Open Street Maps, Google Maps, or Open Street Map and the distance from home (miles and minutes) calculated with `WazeRouteCalculator`.
 
-*Inspired by <https://philhawthorne.com/making-home-assistants-presence-detection-not-so-binary/>* 
-
-### [Go to Person Detection Details](docs/PersonDetection_person_location.md#table-of-contents)
+### **[Open repository README](https://github.com/rodpayne/home-assistant_person_location#home-assistant-person-location-custom-integration) for all available installation and configuration details.**
