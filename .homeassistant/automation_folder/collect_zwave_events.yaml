@@ -1,0 +1,13 @@
+- id: '1624942546561'
+  alias: Event zwave_js_notification
+  description: ''
+  trigger:
+  - platform: event
+    event_type: zwave_js_notification
+  condition: []
+  action:
+  - service: python_script.collect_zwave_events
+    data_template:
+      trigger_event: '{{ trigger.event }}'
+  mode: queued
+  max: 10
