@@ -22,9 +22,9 @@ else:
             event_type = trigger_event[start_pos + 7:end_pos]
     
     outputAttributesObject = {}
-    start_pos = trigger_event.find(":",end_pos)
+    start_pos = trigger_event.find(": ",end_pos)
     end_pos = trigger_event.find(">",start_pos)
-    event_item_list = trigger_event[start_pos + 1:end_pos].split(", ")
+    event_item_list = trigger_event[start_pos + 2:end_pos].split(", ")
     for event_item in event_item_list:
         event_item_pair = event_item.split("=",1)
         outputAttributesObject[event_item_pair[0]] = event_item_pair[1]
