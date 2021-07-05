@@ -62,6 +62,8 @@ automation:
               - condition: template
                 value_template: "{{ states('sensor.updater_core') == 'on' }}"
               - condition: template
+                value_template: "{{ states('sensor.updater_hassos') == 'on' }}"
+              - condition: template
                 value_template: "{{ (states('sensor.updater_supervisor') | float) != 0 }}"
               - condition: template
                 value_template: "{{ (states('sensor.hacs') | float) != 0 }}"
@@ -72,10 +74,10 @@ automation:
               message: |
                 {% set core_entity_id = 'sensor.updater_core' %}
                 {% set os_entity_id = 'sensor.updater_hassos' %}
-                {% if states(core_entity_id) == 'on' %}
+                {% if states(core_entity_id) == 'on' or states(os_entity_id) == 'on' %}
                 [Home Assistant](/hassio/dashboard)
                   {% if states(core_entity_id) == 'on' %}
-                * **Core** {{ state_attr(core_entity_id,"current_version") }} -> {{ state_attr(core_entity_id,"newest_version") }}
+                * **Core** {{ state_attr(core_entity_id,"current_version") }} -> {{ state_attr(core_entity_id,"newest_version") }}  [`PRE-CHECK LOG`](/hassio/addon/core_check_config/logs)
                   {% endif %}
                   {% if states(os_entity_id) == 'on' %}
                 * **OS** {{ state_attr(os_entity_id,"current_version") }} -> {{ state_attr(os_entity_id,"newest_version") }}
@@ -84,7 +86,7 @@ automation:
 
                 {% set supervisor_entity_id = 'sensor.updater_supervisor' %}
                 {% if (states(supervisor_entity_id) | float) != 0 %}
-                [Supervisor](/hassio/dashboard)
+                [Add-ons](/hassio/dashboard)
                   {% for addon in state_attr(supervisor_entity_id, 'addons') %}
                 * [**{{ addon.name }}**](/hassio/addon/{{ addon["slug"] }}/info) {{ addon["version"] }} -> {{ addon["version_latest"] }}
                   {% endfor %}
@@ -104,3 +106,14 @@ automation:
             data:
               notification_id: "updates_pending"
 
+  - alias: Check Home Assistant Configuration
+    id: 29168124-d520-4d81-a867-e4ca453f03
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: sensor.updater_core
+        to: 'on'
+    action:
+      - service: hassio.addon_start
+        data:
+          addon: core_check_config
