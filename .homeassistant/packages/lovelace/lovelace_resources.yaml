@@ -1,0 +1,35 @@
+---
+#---------------------------------------------------------------------------
+# Enable Home Assistant Front-end and provide Lovelace custom resources
+#---------------------------------------------------------------------------
+
+frontend:
+
+lovelace:
+  mode: yaml
+  resources:
+    - url: /local/lovelace-text-input-row.js?v=0.0.8
+      type: module
+#    - url: /local/community/lovelace-text-input-row/lovelace-text-input-row.js
+#      type: module
+    - url: /local/roku-card.js
+      type: module
+    - url: /local/custom_cards/icloud3-event-log-card.js
+      type: module
+    - url: /local/community/lovelace-multiple-entity-row/multiple-entity-row.js
+      type: module
+    - url: /local/community/lovelace-auto-entities/auto-entities.js
+      type: module
+    - url: /local/community/battery-state-card/battery-state-card.js
+      type: module
+    - url: /local/entity-attributes-card.js
+      type: module
+    - url: /local/vertical-stack-in-card.js?v=0.4.0
+      type: module    
+    - url: /hacsfiles/mini-graph-card/mini-graph-card-bundle.js
+      type: module
+#    - url: /hacsfiles/button-card/button-card.js
+#      type: module
+    - url: /hacsfiles/decluttering-card/decluttering-card.js
+      type: module
+                                             

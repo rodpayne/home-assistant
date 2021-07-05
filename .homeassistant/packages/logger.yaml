@@ -1,0 +1,44 @@
+---
+#
+# The logger integration lets you define the level of logging activities in Home Assistant.
+#
+logger:
+#  default: info
+  default: warning
+#  default: debug
+
+  logs:
+
+#    homeassistant.components.python_script.person_sensor_update.py: debug
+#    homeassistant.components.python_script.person_sensor_update.py: info
+
+#    homeassistant.components.python_script.collect_zwave_events.py: debug
+
+#    homeassistant.components.python_script.person_location_update.py: debug
+#    homeassistant.components.python_script.person_location_update.py: info
+
+#    homeassistant.components.python_script.set_state.py: debug
+
+#    homeassistant.components.python_script.device_tracker_merge.py: debug
+    
+    custom_components.person_location: debug
+#    custom_components.person_location: info
+
+#    custom_components.person_sensor_update: debug
+#    custom_components.person_sensor_update: info
+
+#    custom_components.icloud3.pyicloud_ic3: debug
+
+#    homeassistant.core: debug
+
+#    homeassistant.components.mqtt: debug
+#    homeassistant.components.mqtt: info
+
+#    custom_components.alexa_media.notify: debug
+#    custom_components.alexa_media.media_player: debug
+
+#    custom_components.wyzesense: debug
+
+#    wyzesense.gateway: debug
+
+#    custom_components.hello_state: debug

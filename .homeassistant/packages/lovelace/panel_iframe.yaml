@@ -1,0 +1,37 @@
+---
+panel_iframe:
+  status_panel_iframe:
+    title: Status Panel
+    icon: mdi:check-outline
+    url: http://webpi.local/home/status.php?iframe=true 
+
+#  calendar_iframe:
+#    title: Calendar
+#    icon: mdi:check-outline
+#    url: http://webpi.local/home/calendar.php?iframe=true 
+
+  map_iframe:
+    title: Map
+    icon: mdi:check-outline
+    url: http://webpi.local/home/map.php?iframe=true 
+
+  first_floor_iframe:
+    title: First Floor
+    icon: mdi:check-outline
+    url: http://webpi.local/HS/devices.php?location=1stFloor&iframe=true 
+
+  weather_iframe:
+    title: Weather
+    icon: mdi:check-outline
+    url: http://webpi.local/weather/weather.php?map=0&iframe=true 
+
+  motioneye_iframe:
+    title: motionEye
+    icon: mdi:cctv
+    url: http://172.19.54.7:8765/
+
+  homeseer_iframe:
+    title: Homeseer
+    icon: mdi:check-outline
+    url: http://172.19.54.9 
+

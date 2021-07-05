@@ -1,0 +1,99 @@
+---
+# https://community.home-assistant.io/t/a-garbage-day-automation-using-google-calendar-and-pre-warning-that-actually-works/203756
+
+# https://www.home-assistant.io/integrations/calendar.google/
+
+google:
+  client_id: !secret google_calendar_client_id
+  client_secret: !secret google_calendar_secret
+  track_new_calendar: false
+
+automation:
+  - alias: Garbage Collection Day
+    id: 22f45865-1cc4-40ab-840e-537d4c6f8591
+    initial_state: 'on'
+    trigger:
+      - platform: state
+        entity_id: calendar.garbage_collection
+      - platform: homeassistant
+        event: start
+      - platform: time
+        at: "17:30:00"
+    action:
+      - service: python_script.set_state
+        data_template:
+          entity_id: sensor.garbage_collection_day
+          allow_create: true
+          state: |
+            {% set calendar = 'calendar.garbage_collection' %}
+            {% set start = state_attr(calendar,'start_time') %}
+            {{ as_timestamp(start) | timestamp_custom('%a, %B %-m') }}          
+          friendly_name: |
+            {% set calendar = 'calendar.garbage_collection' %}
+            {{ state_attr(calendar,'message') }} Collection
+          message: |
+            {% set calendar = 'calendar.garbage_collection' %}
+            {{ state_attr(calendar,'message') }}
+          start_time: |
+            {% set calendar = 'calendar.garbage_collection' %}
+            {{ state_attr(calendar,'start_time') }}
+          end_time: |
+            {% set calendar = 'calendar.garbage_collection' %}
+            {{ state_attr(calendar,'end_time') }}
+          # set alert on for an all_day event: 7 hours (25200s) = 17:00 the day before and off at 17:00 on the day,
+          #   or on for a normal event: 1 hour (3600s) before the event and off at the end time
+          alert: |
+            {% set calendar = 'calendar.garbage_collection' %}
+            {% set seconds_before_all_day = 25200 %}
+            {% set seconds_before_end_all_day = 25200 %}
+            {% set seconds_before_single = 3600 %}
+            {% set start = state_attr(calendar,'start_time') %}
+            {% if start != None %}
+              {% set _now = now().timestamp() %}
+              {% set start = as_timestamp(start) %}
+              {% set end = as_timestamp(state_attr(calendar,'end_time')) %}
+              {% if _now < end %}
+                {% if state_attr(calendar,'all_day') %}
+                  {{ _now < end - seconds_before_end_all_day and start - _now < seconds_before_all_day }}
+                {% else %}
+                  {{ start - _now < seconds_before_single }}
+                {% endif %}
+              {% else %}
+                false
+              {% endif %}
+            {% else %}
+              false
+            {% endif %}
+          icon: |
+            {% if state_attr('sensor.garbage_collection_day', 'alert') %}
+              mdi:delete-alert
+            {% else %}
+              mdi:delete-outline
+            {% endif %}
+
+  - alias: Garbage Collection Notification
+    id: 22f45865-1cc4-40ab-840e-537d4c6f8592
+    initial_state: 'on'
+    trigger:
+      - platform: state
+        entity_id: sensor.garbage_collection_day
+        attribute: alert
+    action:
+      - alias: Notification message if the bins have to go out for tomorrow
+        choose:
+        - conditions:
+          - condition: state
+            entity_id: sensor.garbage_collection_day
+            attribute: alert
+            state: true
+          sequence:
+            - service: persistent_notification.create
+              data_template:
+                message: |
+                  {{ state_attr(trigger.entity_id,'message') }} will be picked up {{ as_timestamp(state_attr(trigger.entity_id,'start_time')) | timestamp_custom('%A, %B %-m') }}
+                title: "Garbage Collection Notification"
+                notification_id: "garbage_collection_notification"
+        default:
+          - service: persistent_notification.dismiss
+            data:
+              notification_id: "garbage_collection_notification"

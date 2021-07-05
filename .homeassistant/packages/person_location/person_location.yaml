@@ -1,0 +1,29 @@
+---
+person_location:
+
+    google_api_key: !secret google_maps_key
+    create_sensors: bread_crumbs,altitude,direction,driving_miles,driving_minutes,geocoded,latitude,longitude,meters_from_home,miles_from_home,bogus
+#    osm_api_key: !secret gmail_address
+#    mapquest_api_key: !secret mapquest_key
+    mapbox_api_key: !secret mapbox_key
+    person_names:
+      - name: Rod
+        devices:
+        - device_tracker.rod_iphone
+        - device_tracker.rod_iphone_3
+        - sensor.ford_focus_location
+      - name: Pam
+        devices: person.pam
+
+#----------------------------------------------------------------------------------------------------------
+# Device Trackers
+#----------------------------------------------------------------------------------------------------------
+
+mobile_app:
+
+device_tracker:
+  - platform: icloud3
+    username: roderickhpayne@gmail.com
+    password: !secret icloud3_rod
+    config_ic3_file_name: config_ic3.yaml
+

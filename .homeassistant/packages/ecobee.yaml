@@ -1,0 +1,206 @@
+---
+automation:
+
+#----------------------------------------------------------------------------------------------------------
+# Ecobee Thermostat - set Away mode when Current House Mode is set to Away or Vacation
+#----------------------------------------------------------------------------------------------------------
+
+  - alias: Set Thermostat Away
+    id: 7e4eea5a-8f50-4317-a5ca-d0490ef07520
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: input_select.current_house_mode
+    action:
+      service: climate.set_preset_mode
+      data_template:
+        entity_id: climate.springville_house
+        preset_mode: >
+          {% if (trigger.to_state.state == 'Away') %}
+            away
+          {% elif (trigger.to_state.state == 'Vacation') %}
+            away
+          {% else %}
+            Home
+          {% endif %}
+
+#----------------------------------------------------------------------------------------------------------
+# Ecobee Thermostat - set Away mode when back door or front door was left open
+#----------------------------------------------------------------------------------------------------------
+
+  - alias: Door Left Open
+    id: 6cdf795b-070d-4328-be6e-86489c146b3d
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: binary_sensor.wyzesense_7785d741, binary_sensor.wyzesense_7785cda9
+      to: 'on'
+      for: '01:00:00'
+    condition:
+      - condition: template
+        value_template: "{{ states('input_select.current_house_mode') != 'Away' and states('input_select.current_house_mode') != 'Vacation' }}"      
+      - condition: template
+        value_template: "{{ states('binary_sensor.okay_to_open_windows_and_doors') != True }}"      
+    action:
+      - service: climate.set_preset_mode
+        data:
+          entity_id: climate.springville_house
+          preset_mode: 'Away' 
+      - service: persistent_notification.create
+        data_template:
+          message: |
+            {{ state_attr(trigger.entity_id,'friendly_name') }} was left open, resulting in the thermostat being set back.
+            [{{ now().strftime("%Y-%m-%d %H:%M") }}]
+          title: "Door Left Open"
+          notification_id: "Open_Door_Thermostat_Setting"
+
+#----------------------------------------------------------------------------------------------------------
+# Ecobee Thermostat - turn off Away mode when they finally close the door
+#----------------------------------------------------------------------------------------------------------
+
+  - alias: Door Finally Closed
+    id: b9bec461-5709-47be-8158-7862b1b5d47a
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: binary_sensor.wyzesense_7785d741, binary_sensor.wyzesense_7785cda9
+      to: 'off'
+    condition:
+      - condition: template
+        value_template: "{{ state_attr('climate.springville_house','preset_mode') == 'Away' }}"
+      - condition: template
+        value_template: "{{ states('input_select.current_house_mode') != 'Away' and states('input_select.current_house_mode') != 'Vacation' }}"      
+      - condition: state
+        entity_id: binary_sensor.wyzesense_7785d741
+        state: 'off'
+      - condition: state
+        entity_id: binary_sensor.wyzesense_7785cda9
+        state: 'off'
+    action:
+      - service: climate.set_preset_mode
+        data:
+          entity_id: climate.springville_house
+          preset_mode: 'Home' 
+      - service: ecobee.resume_program
+        data:
+          entity_id: climate.springville_house
+          resume_all: false
+      - service: persistent_notification.create
+        data_template:
+          message: |
+            {{ state_attr(trigger.entity_id,'friendly_name') }} was closed, resetting the thermostat to normal operation.
+            [{{ now().strftime("%Y-%m-%d %H:%M") }}]
+          title: "Door Closed"
+          notification_id: "Open_Door_Thermostat_Setting"
+
+#----------------------------------------------------------------------------------------------------------
+# Ecobee Thermostat - watch for outages
+#----------------------------------------------------------------------------------------------------------
+
+  - alias: Reset HVAC Operation Minute Counter
+    id: fcba1b61-9c15-45bf-ad24-531d98c1be96
+    initial_state: 'on'
+    trigger:
+      platform: state
+      entity_id: sensor.hvac_operation
+    action:
+    - service: counter.reset
+      entity_id: counter.hvac_operation_minute_counter
+
+  - alias: Increment HVAC Operation Minute Counter
+    id: a36e8298-2dba-4355-bca3-d47cd2bf80d7
+    initial_state: 'on'
+    trigger:
+      platform: time_pattern
+      minutes: '/1'
+    action:
+    - service: counter.increment
+      entity_id: counter.hvac_operation_minute_counter
+
+  - alias: Check HVAC Operation Minute Counter
+    id: 72dfa84c-a7b7-40c5-b881-997409a46de9
+    initial_state: 'on'
+    trigger:
+      - platform: numeric_state
+        entity_id: counter.hvac_operation_minute_counter
+        above: 240
+        below: 242
+      - platform: sun
+        event: sunrise
+    condition:
+      condition: and
+      conditions:
+        - condition: numeric_state
+          entity_id: sensor.springville_house_temperature
+          below: 65
+        - condition: numeric_state
+          entity_id: counter.hvac_operation_minute_counter
+          above: 120
+        - condition: sun
+          after: sunrise
+        - condition: time
+          before: '21:00:00'
+    action:
+      - service: persistent_notification.create
+        data_template:
+          message: |
+            states('counter.hvac_operation_minute_counter') = {{ states('counter.hvac_operation_minute_counter') }}
+            trigger.entity_id = {{ trigger.entity_id }}
+            Automation was triggered {{ now().strftime("%Y-%m-%d %H:%M") }}
+          title: "Check HVAC Timer/Thermostat/Ecobee Web Site"
+          notification_id: "Check HVAC Operation Minute Counter"
+#      - service: mqtt.publish
+#        data_template:
+#          topic: 'speak/kitchen_tts'
+#          payload: 'Please check the thermostat.'
+
+
+
+sensor:
+
+#----------------------------------------------------------------------------------------------------------
+# Ecobee Thermostat - show current operating mode
+#----------------------------------------------------------------------------------------------------------
+
+  - platform: template
+    sensors:
+      hvac_operation:
+        friendly_name: HVAC Operation
+        value_template: "{{ states.climate.springville_house.attributes.hvac_action | capitalize }}"
+        icon_template: >                                                                                                                                 
+            {% if states.climate.springville_house.attributes.hvac_action %}                                                                                     
+                {% if states.climate.springville_house.attributes.hvac_action == 'cool' %}                                                                             
+                    mdi:air-conditioner                                                                                                                                
+                {% elif states.climate.springville_house.attributes.hvac_action == 'heat' %}                                                                             
+                    mdi:radiator                                                                                                                       
+                {% elif states.climate.springville_house.attributes.hvac_action == 'fan' %}                                                                             
+                    mdi:fan                                                                                                                     
+                {% else %}                                                                                                                                   
+                    mdi:fan-off                                                                                                                       
+                {% endif %}                                                                                                                                  
+            {% endif %}
+
+#----------------------------------------------------------------------------------------------------------
+# Ecobee Thermostat - show outside temperature in history
+#----------------------------------------------------------------------------------------------------------
+
+  - platform: template
+    sensors:
+      outside_temperature:
+        friendly_name: Outside Temperature
+        value_template: "{{ states.weather.springville_house.attributes.temperature }}"
+        device_class: temperature
+        unit_of_measurement: "°F"
+        
+#----------------------------------------------------------------------------------------------------------
+# Ecobee Thermostat - hvac_operation_timer to watch for outages indicated by no changes in operating mode
+#----------------------------------------------------------------------------------------------------------
+
+counter:
+  hvac_operation_minute_counter:
+    icon: mdi:progress-clock
+    name: HVAC Operation Timer
+    initial: 0
+    step: 1
+    restore: false
+

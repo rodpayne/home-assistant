@@ -1,0 +1,140 @@
+---
+automation:
+
+#----------------------------------------------------------------------------------------------------------
+# Garage Controller - send door status to HomeSeer
+#----------------------------------------------------------------------------------------------------------
+
+- alias: Garage Door Open
+  id: 530ee75c-ba35-4018-8bd1-212f25a75638
+  initial_state: 'on'
+  trigger:
+    platform: state
+    entity_id: sensor.garage_door
+    to: 'Open'
+  action:
+    - service: rest_command.homeseer_garage_car_door_open
+    - service: python_script.set_state
+      data_template:
+        entity_id: sensor.garage_door
+        icon: mdi:garage-open
+    - delay:
+        hours: 0
+        minutes: 0
+        seconds: 3
+        milliseconds: 0
+    - service: mqtt.publish
+      data:
+        topic: speak/upstairs_hallway
+        payload: Garage door has been opened.
+
+- alias: Garage Door Closed
+  id: ff4ed9bf-cbc0-472d-856e-b1df973dbdff
+  initial_state: 'on'
+  trigger:
+    platform: state
+    entity_id: sensor.garage_door
+    to: 'Closed'
+  action:
+    - service: rest_command.homeseer_garage_car_door_closed
+    - service: python_script.set_state
+      data_template:
+        entity_id: sensor.garage_door
+        icon: mdi:garage
+    - delay:
+        hours: 0
+        minutes: 0
+        seconds: 30
+        milliseconds: 0
+    - service: device_tracker.icloud3_update
+      data_template:
+        command: location
+
+- alias: Garage Door Alert
+  id: 4f767059-97ee-4111-bdae-52597669c7a2
+  initial_state: 'on'
+  trigger:
+    platform: state
+    entity_id: sensor.garage_door
+    to: 'Alert'
+  action:
+    - service: rest_command.homeseer_garage_car_door_alert
+    - service: python_script.set_state
+      data_template:
+        entity_id: sensor.garage_door
+        icon: mdi:garage-alert
+
+#----------------------------------------------------------------------------------------------------------
+# Garage Controller - motion detector status
+#----------------------------------------------------------------------------------------------------------
+
+- alias: Garage Motion Clear
+  id: dbd48ae9-1387-4ef8-8669-51c52ba04754
+  initial_state: 'on'
+  trigger:
+    platform: state
+    entity_id: sensor.garage_motion_overall
+    to: 'Clear'
+  action:
+    - service: rest_command.homeseer_garage_motion_clear
+  
+- alias: Garage Motion Detected
+  id: 95f6fda2-736a-47d4-ba85-e8d7d3fdd439
+  initial_state: 'on'
+  trigger:
+    platform: state
+    entity_id: sensor.garage_motion_overall
+    to: 'Detected'
+  action:
+    - service: rest_command.homeseer_garage_motion_detected
+  
+rest_command:
+
+  homeseer_garage_car_door_closed:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=85&value=0'
+  homeseer_garage_car_door_open:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=85&value=1'
+  homeseer_garage_car_door_alert:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=85&value=2'
+
+  homeseer_garage_motion_clear:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=132&value=0'
+  homeseer_garage_motion_detected:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=132&value=8'
+
+sensor:
+
+#----------------------------------------------------------------------------------------------------------
+# Garage - watch for both motion detectors on - to eliminate false positives before alerting
+#----------------------------------------------------------------------------------------------------------
+
+  - platform: template
+    sensors:
+      garage_motion_overall:
+        friendly_name: Garage Motion Overall
+#        icon: mdi:run-fast
+        value_template: >
+          {% if is_state('sensor.garage_motion', 'unknown') and is_state('sensor.garage_motion_west', 'unknown') %}
+            unknown
+          {% else %}
+          {%   if is_state('sensor.garage_motion', 'Clear') %}
+            Clear
+          {%   elif is_state('sensor.garage_motion_west', 'Clear') %}                                                                             
+            Clear
+          {%   else %}
+            Detected
+          {%   endif %}
+          {% endif %}
+        icon_template: >
+          {% if is_state('sensor.garage_motion', 'Clear') and is_state('sensor.garage_motion_west', 'Clear') %}
+            mdi:border-none-variant
+          {% else %}
+          {%   if (not is_state('sensor.garage_motion', 'Clear')) and (not is_state('sensor.garage_motion_west', 'Clear')) %}
+            mdi:run-fast  
+          {%   else %}
+            mdi:motion-sensor
+          {%   endif %}
+          {% endif %}
+
+
+

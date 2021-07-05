@@ -1,0 +1,22 @@
+---
+input_select:
+  speak_announcement_destination:
+    name: Where should the announcement be sent?
+    options:
+      - Echo Broadcast
+      - Basement Echo
+      - Kitchen Echo
+      - Office Echo
+      - Sewing Room Echo
+      - Upstairs Hallway Thermostat
+      - Notify Pam
+      - Notify Rod
+      - Notify Tom
+    initial: Echo Broadcast
+
+input_text:
+  notification_message:
+    name: Message
+    initial: ''
+    max: 160
+

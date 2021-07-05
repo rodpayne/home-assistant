@@ -1,0 +1,106 @@
+---
+# https://community.home-assistant.io/t/update-notifications-core-hacs-supervisor-and-addons/182295
+
+sensor:
+
+  # Sensor to track available updates for supervisor & addons
+  - platform: command_line
+    name: Updater Supervisor
+    command: 'curl http://supervisor/supervisor/info -H "Authorization: Bearer $(printenv SUPERVISOR_TOKEN)" | jq ''{"newest_version":.data.version_latest,"current_version":.data.version,"update_available":.data.update_available,"addons":[.data.addons[] | select(.update_available)]}'''
+    scan_interval: 600
+    value_template: "{{ value_json.addons | length }}"
+    unit_of_measurement: pending update(s)
+    json_attributes:
+    - update_available
+    - newest_version
+    - current_version
+    - addons
+
+# Alternate updater sensor for core since binary_sensor.updater is very slow to recognize updates
+  - platform: command_line
+    name: Updater Core
+    command: 'curl http://supervisor/core/info -H "Authorization: Bearer $(printenv SUPERVISOR_TOKEN)" | jq ''{"newest_version":.data.version_latest,"current_version":.data.version}'''
+    scan_interval: 600
+    value_template: "{% if value_json.newest_version != value_json.current_version %}on{% else %}off{% endif %}"
+    json_attributes:
+    - newest_version
+    - current_version
+
+# https://community.home-assistant.io/t/update-notifications-core-hacs-supervisor-and-addons/182295/104
+    
+  - platform: command_line
+    name: Updater HassOS
+    command: 'curl http://supervisor/os/info -H "Authorization: Bearer $(printenv SUPERVISOR_TOKEN)" | jq ''{"newest_version":.data.version_latest,"current_version":.data.version,"update_available":.data.update_available}'''
+    value_template: "{% if value_json.update_available or value_json.newest_version != value_json.current_version %}on{% else %}off{% endif %}"
+    json_attributes:
+    - newest_version
+    - current_version
+    - update_available
+
+automation:
+
+  - alias: Updates Pending
+    id: 29168124-d520-4d81-a867-e4ca453f0320
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: sensor.updater_core
+      - platform: state
+        entity_id: sensor.updater_hassos
+      - platform: state
+        entity_id: sensor.updater_supervisor
+      - platform: state
+        entity_id: sensor.hacs
+      - platform: homeassistant
+        event: start
+    action:
+      - alias: "Update Persistent Notification"
+        choose:
+          conditions:
+          - condition: or
+            conditions:
+              - condition: template
+                value_template: "{{ states('sensor.updater_core') == 'on' }}"
+              - condition: template
+                value_template: "{{ (states('sensor.updater_supervisor') | float) != 0 }}"
+              - condition: template
+                value_template: "{{ (states('sensor.hacs') | float) != 0 }}"
+          sequence:
+          - service: persistent_notification.create
+            data_template:
+              title: Updates Pending
+              message: |
+                {% set core_entity_id = 'sensor.updater_core' %}
+                {% set os_entity_id = 'sensor.updater_hassos' %}
+                {% if states(core_entity_id) == 'on' %}
+                [Home Assistant](/hassio/dashboard)
+                  {% if states(core_entity_id) == 'on' %}
+                * **Core** {{ state_attr(core_entity_id,"current_version") }} -> {{ state_attr(core_entity_id,"newest_version") }}
+                  {% endif %}
+                  {% if states(os_entity_id) == 'on' %}
+                * **OS** {{ state_attr(os_entity_id,"current_version") }} -> {{ state_attr(os_entity_id,"newest_version") }}
+                  {% endif %}
+                {% endif %}
+
+                {% set supervisor_entity_id = 'sensor.updater_supervisor' %}
+                {% if (states(supervisor_entity_id) | float) != 0 %}
+                [Supervisor](/hassio/dashboard)
+                  {% for addon in state_attr(supervisor_entity_id, 'addons') %}
+                * [**{{ addon.name }}**](/hassio/addon/{{ addon["slug"] }}/info) {{ addon["version"] }} -> {{ addon["version_latest"] }}
+                  {% endfor %}
+                {% endif %}
+
+                {% set hacs_entity_id = 'sensor.hacs' %}
+                {% if (states(hacs_entity_id) | float) != 0 %}
+                [HACS](/hacs/entry)
+                  {% for repo in state_attr(hacs_entity_id, 'repositories') %}
+                * **{{ repo.display_name }}** {{ repo["installed_version"] }} -> {{ repo["available_version"] }}
+                  {% endfor %}
+                {% endif %}
+                
+              notification_id: "updates_pending"
+        default:
+          - service: persistent_notification.dismiss
+            data:
+              notification_id: "updates_pending"
+

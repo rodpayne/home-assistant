@@ -1,0 +1,14 @@
+---
+rest_command:
+
+  homeseer_rod_just_arrived:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=76&value=0'
+  homeseer_rod_home:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=76&value=1'
+  homeseer_rod_just_left:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=76&value=2'
+  homeseer_rod_away:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=76&value=3'
+  homeseer_rod_extended_away:
+    url: 'http://172.19.54.9/JSON?request=controldevicebyvalue&ref=76&value=4'
+    

@@ -1,0 +1,8 @@
+---
+person:
+
+  - name: Pam
+    id: 7c6b56c5b76149819d4da7cfa15a133a
+    device_trackers:
+      - device_tracker.pams_iphone
+      
