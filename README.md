@@ -1,5 +1,41 @@
 # **Home Assistant Configuration**
 
+## **Lovelace HomeSeer WD200+ Card**
+This card shows the status of the seven LEDs on the HS-WD200+ dimmer switch connected using `zwave_js`. The color and blinking of the LEDs are set as configuration parameters of the Z-Wave device and the current `zwave_js` integration does not reveal them in attributes of a sensor (yet?).
+
+The code is at: [www/homeseer-wd200-status-card.js](https://raw.githubusercontent.com/rodpayne/home-assistant/main/.homeassistant/www/homeseer-wd200-status-card.js)
+
+With a very basic configuration it looks like this:
+
+![Default card example](docs/images/default-wd200-status2.png)
+```yaml
+    cards:
+      - type: "custom:homeseer-wd200-status-card"
+        entity_id: light.node_20
+```
+
+A few configuration options makes it look like this:
+
+![Customized card example](docs/images/configured-wd200-status.png)
+
+```yaml
+    cards:
+      - type: "custom:homeseer-wd200-status-card"
+        entity_id: light.node_20
+        title: Status Panel
+        labels:
+          - "Garage Side Door"
+          - "Garage House Door"
+          - "Garage Car Door"
+          - "Front Door"
+          - "Basement Door"
+          - "Back Door"
+          - "Alarm"
+```          
+FYI, this is what my installed dimmer switch looks like:
+
+![Dimmer as installed](docs/images/installed-wd200-hardware2.png)
+
 ## **Set State**
 Python Script to set the state or other attributes for the specified entity.
 
