@@ -1,7 +1,7 @@
 # **Home Assistant Configuration**
 
 ## **Lovelace HomeSeer WD200+ Card**
-This card shows the status of the seven LEDs on the HS-WD200+ dimmer switch connected using `zwave_js`. The color and blinking of the LEDs are set as configuration parameters of the Z-Wave device and the current `zwave_js` integration does not reveal them in attributes of a sensor (yet?).
+This card shows the status of the seven LEDs on the HS-WD200+ dimmer switch connected using `zwave_js`. The color and blinking of the LEDs are set as configuration parameters of the Z-Wave device and the current `zwave_js` integration does not reveal them in attributes of a sensor (yet?), so this was kind of a challenge for me.
 
 The code is at: [www/homeseer-wd200-status-card.js](https://raw.githubusercontent.com/rodpayne/home-assistant/main/.homeassistant/www/homeseer-wd200-status-card.js)
 
@@ -14,7 +14,7 @@ With a very basic configuration it looks like this:
         entity_id: light.node_20
 ```
 
-A few configuration options makes it look like this:
+Adding a few configuration options makes it look like this:
 
 ![Customized card example](docs/images/configured-wd200-status.png)
 

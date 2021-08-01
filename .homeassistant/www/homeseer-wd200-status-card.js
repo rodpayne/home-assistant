@@ -25,11 +25,10 @@ class HomeSeerWD200StatusCard extends HTMLElement {
       }
       var friendlyName = 'friendly_name' in state.attributes ? state.attributes['friendly_name'] : entityId;
       var title = (this.config.title) ? this.config.title : friendlyName;
-      this.innerHTML += `
+      this.querySelector('span').innerHTML = `
         <ha-card header="${title}">
           <div class="card-content"></div>
-        </ha-card>
-      `;
+        </ha-card>`;
       this.content = this.querySelector('div');
 
       function _zwaveDeviceThatMatchesName(deviceList, nameByUser) {
@@ -244,6 +243,7 @@ class HomeSeerWD200StatusCard extends HTMLElement {
       }
     }
     </style>
+    <span></span>
     `;
   }
 
