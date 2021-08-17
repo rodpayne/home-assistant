@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        #video {
+            width: 100%;
+            height: 100%;
+            background: black;
+        }
+        #buttonArea {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+        }
+        .actionButton {
+            border: 4px solid #73AD21;
+            border-radius: 3px;
+            background: white;
+        }
+        button.actionButton:hover {
+            border: 4px solid green;
+            font-size: 120%;
+        }
+        #messageArea {
+            color: black;
+            background: yellow;
+            padding: 10px;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <div id="messageArea"></div>
+    <video id="video" autoplay muted playsinline></video>
+    <div id="buttonArea">
+        <button id="mute" class="actionButton" value="muted">Unmute</button>
+        <button id="frontDoorbell" class="actionButton" onclick="changeCamera(this.value,true)"  value="front_doorbell">Front Doorbell</button>
+        <button id="frontPorch"    class="actionButton" onclick="changeCamera(this.value,false)" value="front_porch">Front Porch</button>
+        <button id="sideGate"      class="actionButton" onclick="changeCamera(this.value,true)"  value="side_gate">Side Gate</button>
+    </div>
+    <script>
+        const debugOnScreen = navigator.userAgent.includes('iPhone;');    // (I have been trying to debug HLS on iPhone)
+        
+        function getQueryVariable(variable)
+        {
+            var query = window.location.search.substring(1);
+            var vars = query.split("&");
+            for (var i=0;i<vars.length;i++) {
+                    var pair = vars[i].split("=");
+                    if(pair[0] == variable){return pair[1];}
+            }
+            return(false);
+        }
+        var cameraServer = getQueryVariable('hls_server') || 'http://172.19.54.7:8888';
+        var cameraName = getQueryVariable('camera_name') || 'front_doorbell';
+        var scrollDown = getQueryVariable('scroll_down');
+
+        const messageArea = document.getElementById('messageArea');
+        var message;
+        
+        const video = document.getElementById('video');
+            
+        const create = () => {
+            const videoSrc = cameraServer + '/' + cameraName + '/stream.m3u8';
+            message = 'Video source = ' + videoSrc;
+            console.log(message);
+            if (debugOnScreen) {
+                messageArea.innerHTML += message + '<br>';
+                messageArea.style.display = "block";
+            }
+            
+            // See https://www.npmjs.com/package/hls.js/v/canary
+            // See https://github.com/video-dev/hls.js/blob/master/docs/API.md
+
+            if (Hls.isSupported()) {
+                message = 'HLS play ' + cameraName + ' video...'
+                console.log(message);
+                if (debugOnScreen) {
+                    messageArea.innerHTML += message + '<br>';
+                    messageArea.style.display = "block";
+                }
+                if (typeof create.hls == 'undefined') {
+                    create.hls = new Hls({
+                        // debug: true,
+                        lowLatencyMode: true,
+                        progressive: false,
+                    });
+                }
+
+                create.hls.on(Hls.Events.ERROR, (evt, data) => {
+                    console.log("Hls.Events.ERROR: type=" + data.type + "; details=" + data.details + "; fatal=" + data.fatal);
+                    if (data.fatal) {
+                        switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            // try to recover network error
+                            console.log('fatal network error encountered, try to recover');
+                            create.hls.startLoad();
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            console.log('fatal media error encountered, try to recover');
+                            create.hls.recoverMediaError();
+                            break;
+                        default:
+                            // cannot recover
+                            create.hls.destroy();
+                            setTimeout(() => {
+                                create();
+                            }, 2000);
+                            break;
+                        }
+                    }
+                });
+
+                create.hls.loadSource(videoSrc);
+                create.hls.attachMedia(video);
+
+            } else  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                message = 'Native play ' + cameraName + ' video...';
+                console.log(message);
+                if (debugOnScreen) {
+                    messageArea.innerHTML += message + '<br>';
+                    messageArea.style.display = "block";
+                }
+                video.src = videoSrc;
+            } else {
+                message = "Can't play " + cameraName + " video in this browser.";
+                console.log(message);
+                if (debugOnScreen) {
+                    messageArea.innerHTML += message + '<br>';
+                    messageArea.style.display = "block";
+                }
+            }
+
+            video.play();
+        }
+        create();
+
+        const muteButton = document.getElementById('mute');
+        muteButton.addEventListener('click', () => {
+            if (muteButton.value === 'unmuted') {
+                muteButton.value = 'muted';
+                muteButton.innerHTML = 'Unmute';
+                video.muted = true;
+            } else {
+                muteButton.value = 'unmuted';
+                muteButton.innerHTML = 'Mute';
+                video.muted = false;
+            }
+        });
+
+        function changeCamera (newCamera,newScrollDown = false) {
+            scrollDown = newScrollDown;
+            if (newCamera != cameraName) {
+                cameraName = newCamera;
+                create();
+            } else {
+                video.pause()
+                setTimeout(() => {
+                    video.play();
+                }, 500);
+            }
+        }
+        
+        // See https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement
+        // See https://www.w3.org/2010/05/video/mediaevents.html
+        
+        video.addEventListener('play', (event) => {
+            if (scrollDown) {
+                setTimeout(() => {
+                    window.scrollTo(0, document.body.scrollHeight);
+                    }, 3000); 
+            } else {
+                window.scrollTo(0, 0); 
+            }
+        });
+
+        video.addEventListener('playing', (event) => {
+            console.log('Video is playing.');
+            messageArea.style.display = "none";
+        });
+
+        video.addEventListener('stalled', (event) => {
+            console.log('Video failed to fetch data, but trying.');
+        });
+
+        video.addEventListener('error', () => {
+            console.error(`Video error loading: ${cameraName}`);
+        });
+
+        video.addEventListener('waiting', (event) => {
+            console.log('Video is waiting for more data.');
+        });
+
+    </script>
+
+</body>
+
+</html>
