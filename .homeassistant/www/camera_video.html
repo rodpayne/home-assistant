@@ -1,23 +1,60 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="utf-8">
     <style>
+        BODY {
+            overflow: hidden;
+        }
         #video {
             width: 100%;
-            height: 100%;
+            height: auto;
             background: black;
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #stillImage {
+            width: 100%;
+            height: auto;
+            background: black;
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
         }
         #buttonArea {
             position: fixed;
-            bottom: 20px;
-            left: 20px;
+            top: 4px;
+            left: 4px;
+            color: white;
+            background: rgba(128,128,128,0.25);
+            border-radius: 3px;
+            padding: 8px;
+        }
+        #typeIconArea {
+            position: fixed;
+            top: 8px;
+            right: 4px;
+            width:24px;
+            height:24px;
+            background: rgba(255,255,0,0.25);
+            border-radius: 3px;
+        }
+        #typeIcon [
+            width:24px;
+            height:24px;
+            background: rgba(0,0,0,0.25);
+        }
+        #typeLabel {
+            color: white;
+            font-size: 120%;
         }
         .actionButton {
             border: 4px solid #73AD21;
             border-radius: 3px;
-            background: white;
+            background: rgba(255,255,255,0.25);
         }
         button.actionButton:hover {
             border: 4px solid green;
@@ -34,16 +71,46 @@
 
 <body>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <div id="messageArea"></div>
-    <video id="video" autoplay muted playsinline></video>
-    <div id="buttonArea">
-        <button id="mute" class="actionButton" value="muted">Unmute</button>
-        <button id="frontDoorbell" class="actionButton" onclick="changeCamera(this.value,true)"  value="front_doorbell">Front Doorbell</button>
-        <button id="frontPorch"    class="actionButton" onclick="changeCamera(this.value,false)" value="front_porch">Front Porch</button>
-        <button id="sideGate"      class="actionButton" onclick="changeCamera(this.value,true)"  value="side_gate">Side Gate</button>
+    <div>
+        <div id="messageArea"></div>
+        <video id="video" autoplay muted playsinline></video>
+        <img id="stillImage">
+        <div id="typeIconArea">
+            <img id="typeIcon" src="/local/outline_refresh_white_24dp.png" title="Loading">
+        </div>   
+        <div id="buttonArea">
+            <span id="typeLabel"></span>
+            <button id="mute" class="actionButton" style="display: none;" value="muted">Unmute</button>
+            <button id="frontDoorbell" class="actionButton" style="display: none;" onclick="changeCamera(this.value,true,true)"  value="front_doorbell">Front Doorbell</button>
+            <button id="frontPorch"    class="actionButton" style="display: none;" onclick="changeCamera(this.value,false,false)" value="front_porch">Front Porch</button>
+            <button id="sideGate"      class="actionButton" style="display: none;" onclick="changeCamera(this.value,true,false)"  value="side_gate">Side Gate</button>
+        </div>
     </div>
     <script>
-        const debugOnScreen = navigator.userAgent.includes('iPhone;');    // (I have been trying to debug HLS on iPhone)
+/*******************************************************************************
+
+    This page displays the video from a security camera.  It uses a variety of 
+    technologies to find one that will work in a particular browser.
+    1. `Latest JPEG` pulled from Frigate, repeated until one of the following 
+        videos successfully plays.
+    2. `HLS Playback` streamed from rstp-simple-server proxy (so that camera
+        only has to serve one stream).
+    3. `Native Playback` streamed using the browser's native support for 
+       `application/vnd.apple.mpegurl` stream.  Note that this currently fails
+       for iPhones with software version 14+, so `Latest JPEG` continues to be
+       shown.
+       
+    `allow_unmute`   - option to show a mute/unmute button to turn audio on/off.
+    `camera_name`    - name of a particular camera to select.
+    `delay_time`     - millisecond delay between loading JPEG pictures.
+    `frigate_server` - location of the Frigate server.
+    `hls_server`     - location of the proxy server.
+    `title`          - label to be shown on the video.
+    `scroll_down`    - option to initially scroll the video down. 
+
+*******************************************************************************/
+//        const debugOnScreen = navigator.userAgent.includes('iPhone;');    // (I have been trying to debug HLS on iPhone)
+        const debugOnScreen = false;
         
         function getQueryVariable(variable)
         {
@@ -55,16 +122,94 @@
             }
             return(false);
         }
-        var cameraServer = getQueryVariable('hls_server') || 'http://172.19.54.7:8888';
+        var allowUnmute = getQueryVariable('allow_unmute');
         var cameraName = getQueryVariable('camera_name') || 'front_doorbell';
+        const cameraServer = getQueryVariable('hls_server') || 'http://172.19.54.7:8888';
+        const delayTime = parseInt(getQueryVariable('delay_time') || '500');
+        const frigateServer = getQueryVariable('frigate_server') || 'http://172.19.54.77:5000';
+        const title = getQueryVariable('title');
         var scrollDown = getQueryVariable('scroll_down');
 
-        const messageArea = document.getElementById('messageArea');
-        var message;
-        
         const video = document.getElementById('video');
+        const stillImage = document.getElementById('stillImage');
+        const messageArea = document.getElementById('messageArea');
+        
+        var message;
+        var typeIconSource = "/local/outline_refresh_white_24dp.png"
+        var typeIconTitle = "Loading"
+        
+
+/*******************************************************************************
+    Start the JPEG image loads
+*******************************************************************************/
+
+        function scrollDownIfNeeded () {
+            element = document.scrollingElement;
+            if (scrollDown) {
+            //    element.scrollIntoView(false);
+                var scrollOptions = {
+                    top: 99999,
+                    behavior: 'smooth'
+                }
+                element.scrollTo(scrollOptions);
+            } else {
+            //    element.scrollIntoView(true);
+                element.scrollTo(0, 0); 
+            }
+        }
+
+        var stillImageSource;
+        var loadingFirstImage;
+
+        function refreshStillImage () {
+            if ( (stillImage.style.display != 'none') && (document.visibilityState === 'visible') ) {
+                stillImage.src = stillImageSource + '?cache=' + Number(new Date());
+            }
+        } 
+        
+        stillImage.onload = function() {
+            if (loadingFirstImage) {
+                loadingFirstImage = false;
+                scrollDownIfNeeded ();        
+            }
+            setTimeout(refreshStillImage(), delayTime);
+        }
+
+        function startStillImage () {
+            console.log('Start Still Image ' + cameraName);
+            stillImageSource = frigateServer + '/api/' + cameraName + '/latest.jpg';
+            video.style.display = 'none';
+            stillImage.style.display = 'block';
+            typeIcon.src="/local/outline_photo_camera_white_24dp.png";
+            typeIcon.title="Latest JPEG";
+            document.getElementById('mute').style.display = 'none'; 
             
+            loadingFirstImage = true;
+            refreshStillImage();
+        }
+       
+        startStillImage();
+
+/*******************************************************************************
+    Start the video stream if possible
+    See https://www.npmjs.com/package/hls.js/v/canary
+    See https://github.com/video-dev/hls.js/blob/master/docs/API.md
+*******************************************************************************/
+        var loadingFirstVideoFrame;
+        
         const create = () => {
+            if (title == 'camera_name') {
+                document.getElementById('typeLabel').innerHTML = cameraName;
+            } else if (title === 'friendly_name') {
+                var friendlyName = cameraName.replace('_',' ').split(' ');
+                for (let i = 0; i < friendlyName.length; i++) {
+                    friendlyName[i] = friendlyName[i][0].toUpperCase() + friendlyName[i].substr(1);
+                }
+                document.getElementById('typeLabel').innerHTML = friendlyName.join(" ");
+            } else if (`${title}` !== `${false}`) {
+                document.getElementById('typeLabel').innerHTML = decodeURI(title);
+            }
+                    
             const videoSrc = cameraServer + '/' + cameraName + '/stream.m3u8';
             message = 'Video source = ' + videoSrc;
             console.log(message);
@@ -73,11 +218,10 @@
                 messageArea.style.display = "block";
             }
             
-            // See https://www.npmjs.com/package/hls.js/v/canary
-            // See https://github.com/video-dev/hls.js/blob/master/docs/API.md
-
             if (Hls.isSupported()) {
-                message = 'HLS play ' + cameraName + ' video...'
+                typeIconSource = "/local/outline_videocam_white_24dp.png";
+                typeIconTitle = "HLS Playback";
+                message = 'HLS play ' + cameraName + ' video...';
                 console.log(message);
                 if (debugOnScreen) {
                     messageArea.innerHTML += message + '<br>';
@@ -90,10 +234,12 @@
                         progressive: false,
                     });
                 }
-
+                
                 create.hls.on(Hls.Events.ERROR, (evt, data) => {
-                    console.log("Hls.Events.ERROR: type=" + data.type + "; details=" + data.details + "; fatal=" + data.fatal);
+                    console.log("Hls.Events.ERROR " + cameraName + ": type=" + data.type + "; details=" + data.details + "; fatal=" + data.fatal);
                     if (data.fatal) {
+                        startStillImage();
+                        
                         switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
                             // try to recover network error
@@ -107,6 +253,7 @@
                         default:
                             // cannot recover
                             create.hls.destroy();
+                            
                             setTimeout(() => {
                                 create();
                             }, 2000);
@@ -119,6 +266,8 @@
                 create.hls.attachMedia(video);
 
             } else  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                typeIconSource = "/local/outline_live_tv_white_24dp.png";
+                typeIconTitle = "Native Playback";
                 message = 'Native play ' + cameraName + ' video...';
                 console.log(message);
                 if (debugOnScreen) {
@@ -128,17 +277,78 @@
                 video.src = videoSrc;
             } else {
                 message = "Can't play " + cameraName + " video in this browser.";
+                typeIconSource = "/local/outline_videocam_off_white_24dp.png";
                 console.log(message);
                 if (debugOnScreen) {
                     messageArea.innerHTML += message + '<br>';
                     messageArea.style.display = "block";
                 }
             }
-
+            loadingFirstVideoFrame = true;            
             video.play();
         }
-        create();
+        
+/*******************************************************************************
+    video event listeners
+    See https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement#events
+    See https://www.w3.org/2010/05/video/mediaevents.html
+*******************************************************************************/
+        
+        video.addEventListener('playing', (event) => {
+            console.log('Video for ' + cameraName + ' is playing.');
+            typeIcon.src = typeIconSource;
+            typeIcon.title = typeIconTitle;
+            typeIconArea.style.background = 'rgba(128,128,128,0.5)';
+            if ( (stillImage.style.display != 'none') && (! loadingFirstImage) ) {
+                video.style.height = stillImage.clientHeight;
+            }
+            video.style.display = 'block';
+            messageArea.style.display = "none";
+            stillImage.style.display = 'none';
+            if (allowUnmute) {
+                document.getElementById('mute').style.display = 'inline'; 
+            }
+            if (loadingFirstVideoFrame) {
+                loadingFirstVideoFrame = false;
+                scrollDownIfNeeded();
+            }
+        });
 
+        video.addEventListener('stalled', (event) => {
+            console.log('Video for ' + cameraName + ' failed to fetch data, but trying.');
+        });
+
+        video.addEventListener('error', () => {
+            console.error(`Video error loading: ${cameraName}`);
+        });
+
+        video.addEventListener('waiting', (event) => {
+            console.log('Video for ' + cameraName + ' is waiting for more data.');
+        });
+
+/*******************************************************************************
+    document event listeners
+    See https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilitychange_event
+*******************************************************************************/
+        
+        document.addEventListener("visibilitychange", function() {
+          if (document.visibilityState === 'visible') {
+            console.log('Resume');
+            if (stillImage.style.display !== 'none') {
+                refreshStillImage();
+            }
+            if (video.style.display !== 'none') {
+                video.play();
+            }
+          } else {
+            console.log('Pause');
+            video.pause();
+          }
+        });
+
+/*******************************************************************************
+    other page element events
+*******************************************************************************/
         const muteButton = document.getElementById('mute');
         muteButton.addEventListener('click', () => {
             if (muteButton.value === 'unmuted') {
@@ -152,10 +362,12 @@
             }
         });
 
-        function changeCamera (newCamera,newScrollDown = false) {
+        function changeCamera (newCamera,newScrollDown = false,newAllowUnmute) {
             scrollDown = newScrollDown;
+            allowMute = newAllowUnmute;
             if (newCamera != cameraName) {
                 cameraName = newCamera;
+                startStillImage;
                 create();
             } else {
                 video.pause()
@@ -164,36 +376,8 @@
                 }, 500);
             }
         }
-        
-        // See https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement
-        // See https://www.w3.org/2010/05/video/mediaevents.html
-        
-        video.addEventListener('play', (event) => {
-            if (scrollDown) {
-                setTimeout(() => {
-                    window.scrollTo(0, document.body.scrollHeight);
-                    }, 3000); 
-            } else {
-                window.scrollTo(0, 0); 
-            }
-        });
 
-        video.addEventListener('playing', (event) => {
-            console.log('Video is playing.');
-            messageArea.style.display = "none";
-        });
-
-        video.addEventListener('stalled', (event) => {
-            console.log('Video failed to fetch data, but trying.');
-        });
-
-        video.addEventListener('error', () => {
-            console.error(`Video error loading: ${cameraName}`);
-        });
-
-        video.addEventListener('waiting', (event) => {
-            console.log('Video is waiting for more data.');
-        });
+        create();
 
     </script>
 
