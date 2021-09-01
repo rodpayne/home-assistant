@@ -236,7 +236,7 @@
         if (title == 'camera_name') {
             document.getElementById('typeLabel').innerHTML = cameraName;
         } else if (title === 'friendly_name') {
-            document.getElementById('typeLabel').innerHTML = friendlyName.join(" ");
+            document.getElementById('typeLabel').innerHTML = friendlyName;
         } else if (`${title}` !== `${false}`) {
             document.getElementById('typeLabel').innerHTML = decodeURI(title);
         }
