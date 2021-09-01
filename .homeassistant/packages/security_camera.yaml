@@ -1,0 +1,230 @@
+
+media_source:
+
+stream:
+
+camera:
+  - platform: ffmpeg
+    name: Front Porch
+    input: -rtsp_transport tcp -i rtsp://172.19.54.7:8554/front_porch
+
+  - platform: ffmpeg
+    name: Side Gate
+    input: -rtsp_transport tcp -i rtsp://172.19.54.7:8554/side_gate
+
+  - platform: ffmpeg
+    name: Front Doorbell
+    input: -rtsp_transport tcp -i rtsp://172.19.54.7:8554/front_doorbell
+   
+  - platform: generic
+    name: Front Porch generic
+    still_image_url: http://172.19.54.77:8123/local/PleaseStandBy.jpg
+    stream_source: rtsp://172.19.54.7:8554/front_porch
+
+  - platform: generic
+    name: Side Gate generic
+    still_image_url: http://172.19.54.77:8123/local/PleaseStandBy.jpg
+    stream_source: rtsp://172.19.54.7:8554/side_gate
+
+  - platform: generic
+    name: Front Doorbell generic
+    still_image_url: http://172.19.54.77:8123/local/PleaseStandBy.jpg
+    stream_source: rtsp://172.19.54.7:8554/front_doorbell
+
+  - platform: generic
+    still_image_url: http://172.19.54.77:8123/local/camera_video.html?camera_name=front_doorbell
+    content_type: image/gif
+    name: Front Doorbell HLS
+  
+automation:
+
+    - id: '1626626524197'
+      alias: Front Porch Person
+      description: This automation is triggered when Frigate detects a person in the Front
+        Porch camera.  A notification is made when the Garage Door and the Front Door
+        are closed and locked (so it is probably not us).
+      trigger:
+      - platform: state
+        entity_id: sensor.front_porch_person
+        from: '0'
+      - platform: state
+        entity_id: sensor.front_doorbell_person
+        from: '0'
+      - platform: state
+        entity_id: binary_sensor.front_doorbell_doorbell
+        to: 'On'
+      condition:
+      - condition: device
+        alias: "Front Door is locked"
+        device_id: 97372c2646ad4379287e54cf15342eec
+        domain: lock
+        entity_id: lock.front_door_lock
+        type: is_locked
+      - condition: state
+        alias: "Garage Door is closed"
+        entity_id: sensor.garage_door
+        state: Closed
+      - condition: template
+        alias: "Front Door closed for at least 60 seconds"
+        value_template: "{{ ((states('binary_sensor.wyzesense_7785cda9') == 'off') and (as_timestamp(now()) - as_timestamp(states.binary_sensor.wyzesense_7785cda9.last_changed) > 60)) }}"
+      - condition: template
+        alias: "Rod did not just arrive home"
+        value_template: "{{ (states('sensor.rod_location') != 'Just Arrived') }}"
+      - condition: template
+        alias: "Previous notification was not in the last 60 seconds"
+        value_template: "{{ ((states('sensor.front_porch_person_notification') == 'unknown')) or (as_timestamp(now()) - as_timestamp(states.sensor.front_porch_person_notification.last_changed) > 60) }}"
+      - condition: state
+        alias: "Ignore event at HA startup"
+        entity_id: automation.ha_just_started
+        state: "off"
+      action:
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ trigger.to_state.state == ''1'' }}'
+          sequence:
+          - service: mqtt.publish
+            data:
+              topic: speak/sewing_room
+              payload: It looks like there is a person at the Front Porch.
+          - service: mqtt.publish
+            data:
+              topic: speak/upstairs_hallway
+              payload: It looks like there is a person at the Front Porch.
+          - service: python_script.set_state
+            data_template:
+              entity_id: 'sensor.front_porch_person_notification'
+              friendly_name: 'Front Porch Notification'
+              allow_create: true
+              state: "{{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d %H:%M:%S') }}"
+              trigger: '{{ trigger.entity_id }}'
+        default:
+          - service: mqtt.publish
+            data:
+              topic: speak/sewing_room
+              payload: It looks like there are people at the Front Porch.
+          - service: mqtt.publish
+            data:
+              topic: speak/upstairs_hallway
+              payload: It looks like there are people at the Front Porch.
+          - service: python_script.set_state
+            data_template:
+              entity_id: 'sensor.front_porch_person_notification'
+              friendly_name: 'Front Porch Notification'
+              allow_create: true
+              state: "{{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d %H:%M:%S') }}"
+              trigger: '{{ trigger.entity_id }}'
+      mode: queued
+      max: 10
+
+    - id: '64c1e7ea-6357-404f-8f22-ee35c324d2b2'
+      alias: Side Gate Person
+      description: This automation is triggered when Frigate detects a person in the Side Gate camera.  
+        A notification is made when the Garage Car Door and the Garage Side Door
+        are closed and locked (so it is probably not us).
+      trigger:
+      - platform: state
+        entity_id: sensor.side_gate_person
+        from: '0'
+      condition:
+      - condition: device
+        alias: "Garage Side Door is locked"
+        device_id: fa1472a605aa194519acda80a0569921
+        domain: lock
+        entity_id: lock.garage_side_door_lock
+        type: is_locked
+      - condition: state
+        alias: "Garage Door is closed"
+        entity_id: sensor.garage_door
+        state: Closed
+      - condition: template
+        alias: "Garage Side Door closed for at least 60 seconds"
+        value_template: "{{ ((states('binary_sensor.wyzesense_777f66d6') == 'off') and (as_timestamp(now()) - as_timestamp(states.binary_sensor.wyzesense_777f66d6.last_changed) > 60)) }}"
+      - condition: template
+        alias: "Basement Door closed for at least 60 seconds"
+        value_template: "{{ ((states('binary_sensor.wyzesense_777f6787') == 'off') and (as_timestamp(now()) - as_timestamp(states.binary_sensor.wyzesense_777f66d6.last_changed) > 60)) }}"
+      - condition: template
+        alias: "Previous notification was not in the last 2 minutes"
+        value_template: "{{ ((states('sensor.side_gate_person_notification') == 'unknown')) or (as_timestamp(now()) - as_timestamp(states.sensor.side_gate_person_notification.last_changed) > 120) }}"
+      - condition: state
+        alias: "Ignore event at HA startup"
+        entity_id: automation.ha_just_started
+        state: "off"
+      action:
+      - choose:
+        - conditions:
+          - condition: template
+            value_template: '{{ trigger.to_state.state == ''1'' }}'
+          sequence:
+          - service: mqtt.publish
+            data:
+              topic: speak/sewing_room
+              payload: It looks like there is a person at the Side Gate.
+          - service: mqtt.publish
+            data:
+              topic: speak/upstairs_hallway
+              payload: It looks like there is a person at the Side Gate.
+          - service: python_script.set_state
+            data_template:
+              entity_id: 'side_gate_person_notification'
+              friendly_name: 'Side Gate Notification'
+              allow_create: true
+              state: "{{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d %H:%M:%S') }}"
+              trigger: '{{ trigger.entity_id }}'
+        default:
+          - service: mqtt.publish
+            data:
+              topic: speak/sewing_room
+              payload: It looks like there are people at the Side Gate.
+          - service: mqtt.publish
+            data:
+              topic: speak/upstairs_hallway
+              payload: It looks like there are people at the Side Gate.
+          - service: python_script.set_state
+            data_template:
+              entity_id: 'side_gate_person_notification'
+              friendly_name: 'Side Gate Notification'
+              allow_create: true
+              state: "{{ as_timestamp(now()) | timestamp_custom('%Y-%m-%d %H:%M:%S') }}"
+              trigger: '{{ trigger.entity_id }}'
+
+      mode: queued
+      max: 10
+
+script:
+  create_camera_link_front_doorbell:
+    alias: Create Camera Link Front Doorbell
+    sequence:
+      - variables:
+          link_id: "{% for _ in range(40) %}{{ range(10)|random }}{% endfor %}"
+
+      - service: webrtc.create_link
+        data:
+          link_id: "{{ link_id }}"  # create a random or permanent link ID
+          # url: rtsp://rtsp:12345678@192.168.1.123:554/av_stream/ch0
+          entity: camera.front_doorbell  # you can use camera entity_id or url
+          open_limit: 2  # how many times a link can be opened (0 - unlimit, 1 - default)
+          time_to_live: 60  # how many seconds will the link live (0 - unlimit, 60 - default)
+
+      - service: persistent_notification.create
+        data:
+          message: '<a href="/webrtc/embed?url={{ link_id }}" target="_blank">Open Front Doorbell Camera</a>' 
+          
+  create_camera_link_front_doorbell_person:
+    alias: Create Camera Link Front Doorbell Person
+    sequence:
+      - variables:
+          link_id: "{% for _ in range(40) %}{{ range(10)|random }}{% endfor %}"
+
+      - service: webrtc.create_link
+        data:
+          link_id: "{{ link_id }}"  # create a random or permanent link ID
+          # url: rtsp://rtsp:12345678@192.168.1.123:554/av_stream/ch0
+          entity: camera.front_doorbell_person  # you can use camera entity_id or url
+          open_limit: 2  # how many times a link can be opened (0 - unlimit, 1 - default)
+          time_to_live: 60  # how many seconds will the link live (0 - unlimit, 60 - default)
+
+      - service: persistent_notification.create
+        data:
+          message: '<a href="/webrtc/embed?url={{ link_id }}" target="_blank">Open Camera</a>' 
+          

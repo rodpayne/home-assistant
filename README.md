@@ -1,5 +1,19 @@
 # **Home Assistant Configuration**
 
+## **Security Camera Stuff**
+I have the following camera related components installed in my configuration.
+
+| Component            | Description                            | Notes                             |
+| -------------------- | -------------------------------------- | --------------------------------- |
+[rtsp-simple-server](https://github.com/aler9/rtsp-simple-server) | "rtsp-simple-server is a ready-to-use and zero-dependency RTSP / RTMP / HLS server and proxy, a software that allows users to publish, read and proxy live video and audio streams." | This proxy is used so that multiple streams do not overwhelm less capable (cheap) cameras. It runs in Docker independently of Home Assistant, in fact it is running on an old Raspberry Pi. |
+[Frigate NVR Add-on](https://github.com/blakeblackshear/frigate) | "A complete and local NVR designed for Home Assistant with AI object detection. Uses OpenCV and Tensorflow to perform realtime object detection locally for IP cameras." | This adds object detection for even cheap cameras (without running it in the cloud), so that events can be triggered based on a person moving rather than leaves and shadows moving. The Google Coral USB Accellerator gives enough performance to run this on a Raspberry Pi. |
+[Frigate Integration](https://github.com/blakeblackshear/frigate-hass-integration) | Integrates Frigate with Home Assistant. | Configures all entities to control Frigate and receive updates. Frigate publishes event information in the form of a change feed via MQTT. |
+[Wyse Cam V2](https://wyze.com/wyze-cam-v2.html) | A cheap indoor camera with audio. | Using the [alternate Wyse RTSP firmware](https://download.wyzecam.com/firmware/rtsp/demo_4.28.4.51.bin) to access the camera stream locally. I experimented with the [Xiaomi Dafang Hack](https://github.com/EliasKotlyar/Xiaomi-Dafang-Hacks), which was interesting, but could not get any more reliability than the Wyze firmware. |
+[Amcrest AD110 Video Doorbell](https://amcrest.com/smarthome-2-megapixel-wireless-doorbell-security-camera-1920-x-1080p-wifi-doorbell-camera-ip55-weatherproof-two-way-audio-ad110.html) | Good quality video doorbell with local RTSP communication and two-way audio. | Have not had any problems with it. |
+packages/security_camera.yaml | Configuration and automations | |
+www/camera_video.html | This webpage displays the video from a security camera.  It uses a variety of technologies to find one that will work in a particular browser and keeps it running. | Can be used in a Lovelace webpage (iframe) card or panel, as an [iframe-fullscreen custom panel](https://www.technicallywizardry.com/home-assistant-custom-panels/), or stand-alone in a browser.  |
+
+
 ## **Lovelace HomeSeer WD200+ Card**
 This card shows the status of the seven LEDs on the HS-WD200+ dimmer switch connected using `zwave_js`. The color and blinking of the LEDs are set as configuration parameters of the Z-Wave device and the current `zwave_js` integration does not reveal them in attributes of a sensor (yet?), so this was kind of a challenge for me.
 
