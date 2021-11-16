@@ -124,7 +124,7 @@
     3. `Native Playback` streamed using the browser's native support for 
        `application/vnd.apple.mpegurl` stream.  Note that this currently fails
        for iPhones with software version 14+, so `Latest JPEG` continues to be
-       shown.
+       shown. *Working again on 14.8+ and maybe it started working earlier.* 
        
     `allow_unmute`   - option to show a mute/unmute button to turn audio on/off.
     `camera_name`    - name of a particular camera to select.
@@ -151,7 +151,7 @@
     var allowUnmute = getQueryVariable('allow_unmute');
     var cameraName = getQueryVariable('camera_name') || 'front_doorbell';
     const cameraServer = getQueryVariable('hls_server') || 'http://172.19.54.7:8888';
-    const delayTime = parseInt(getQueryVariable('delay_time') || '1000');
+    const stillImageDelayTime = parseInt(getQueryVariable('delay_time') || '1000');
     const frigateServer = getQueryVariable('frigate_server') || 'http://172.19.54.77:5000';
     const title = getQueryVariable('title');
     var scrollDown = getQueryVariable('scroll_down');
@@ -165,7 +165,7 @@
     
     var message;
     var upcomingTypeIconSource = "/local/outline_refresh_white_24dp.png"
-    var upcomingTypeIconTitle = "Loading"
+    var upcomingTypeIconTitle = "Latest JPEG"
     
     function logMessage(message) {
         console.debug((new Date).toLocaleString('en-US').replace(',','') + ' - ' + cameraName + ' - ' + $typeIcon.title + ' - ' + message);
@@ -184,24 +184,14 @@
     $NativePlayback.disabled = ! supportsNativePlayback;
     
     var countImageLoads = 0;
-    var countXHRLoads = 0;
     var countHLSLoads = 0;
- /*   
-    // Add a global XMLHttpRequest load event listener:
-    let open = XMLHttpRequest.prototype.open; 
-    // Overwrite the native XMLHttpRequest method
-    XMLHttpRequest.prototype.open = function(xhrMethod, xhrURL) {
-        // Assign an load event listener
-        this.addEventListener("load", event => { 
-            if ( (event.loaded > 0) && (xhrURL.endsWith(".ts")) ) {
-                logMessage(xhrMethod + " completed " + xhrURL + " stillimage = " + $stillImage.style.display + " video = " + $video.style.display + " transferred = " + event.loaded);
-                countXHRLoads++;
-            }
-        }, false);
-        // Call the stored reference to the native method
-        open.apply(this, arguments);
-    };         /* Debugging to see if anything is happening with video stream */
+    var countVideoStreamTimeouts = 0;
 
+    function logStatistics () {
+        logMessage("countVideoStreamTimeouts = " + countVideoStreamTimeouts + "; countImageLoads = " + countImageLoads + "; countHLSLoads = " + countHLSLoads);
+    }
+    setInterval(logStatistics, 60 * 60 * 1000);
+    
 /*******************************************************************************
     Start the JPEG image loads
 *******************************************************************************/
@@ -235,7 +225,7 @@
             loadingFirstImage = false;
             scrollDownIfNeeded ();        
         }
-        setTimeout(refreshStillImage, delayTime);
+        setTimeout(refreshStillImage, stillImageDelayTime);
     }
 
     function showStillImage () {
@@ -264,6 +254,7 @@
                 
         loadingFirstImage = true;
         refreshStillImage();
+        
     }
    
     showStillImage();
@@ -277,6 +268,19 @@
     var loadingFirstVideoFrame;
     var blockVideoPlayback = false;
     var favorNativePlayback = false;
+    var timerForVideoStreamTimeout = null;
+    
+    function videoStreamTimedOut () {
+        logMessage("videoStreamTimedOut()");
+        countVideoStreamTimeouts++;
+        logStatistics();
+        changeStream(upcomingTypeIconTitle);
+    }
+    
+    function restartTimerForVideoStreamTimeout () {
+        clearTimeout(timerForVideoStreamTimeout);
+        timerForVideoStreamTimeout = setTimeout(videoStreamTimedOut, 60000);
+    }
     
     function create () {
         if (blockVideoPlayback) {
@@ -310,6 +314,10 @@
                                     if ( (event.loaded > 0) && (url.endsWith(".ts")) ) {
                                         logMessage("HLS load complete for " + url + " transferred = " + event.loaded);
                                         countHLSLoads++;
+                                        restartTimerForVideoStreamTimeout();
+                                        if (loadingFirstVideoFrame) {
+                                            showVideoInsteadOfImage();
+                                        }
                                     }
                                 }, false);
                     },                   
@@ -359,6 +367,7 @@
         } else {
             message = "Can't play video in this browser.";
             upcomingTypeIconSource = "/local/outline_videocam_off_white_24dp.png";
+            upcomingTypeIconTitle = "Can't Play Video";
             logMessage(message);
             if (debugOnScreen) {
                 $messageArea.innerHTML += message + '<br>';
@@ -387,6 +396,9 @@
             loadingFirstVideoFrame = false;
             scrollDownIfNeeded();
         }
+        if (upcomingTypeIconTitle == "HLS Playback") {
+            restartTimerForVideoStreamTimeout();
+        }
     }
         
 /*******************************************************************************
@@ -397,7 +409,9 @@
 
     $video.addEventListener('playing', (event) => {
         logMessage('Video is playing.');
-        showVideoInsteadOfImage();
+        if (loadingFirstVideoFrame) {
+            showVideoInsteadOfImage();
+        }
     });
 
     $video.addEventListener('stalled', (event) => {
@@ -423,13 +437,18 @@
         if ($typeIcon.title == "Latest JPEG") {
             refreshStillImage();
         } else if ($typeIcon.title == "HLS Playback") {
+            loadingFirstVideoFrame = true;
             $video.play();
             create.hls.startLoad();
+            restartTimerForVideoStreamTimeout();
         } else {
+            loadingFirstVideoFrame = true;
             $video.play();
+            restartTimerForVideoStreamTimeout();
         }
       } else {
         logMessage('Pause');
+        clearTimeout(timerForVideoStreamTimeout);
         $video.pause();
         create.hls.stopLoad();
       }
@@ -449,6 +468,19 @@
 
     function changeStream (newStreamType) {
         logMessage('Change Stream to "' + newStreamType + '"');
+        /* Stop previous stream */
+        if (upcomingTypeIconTitle = "HLS Playback") {
+            clearTimeout(timerForVideoStreamTimeout);
+            $video.pause();
+            create.hls.stopLoad();
+        } else if (upcomingTypeIconTitle = "Native Playback") {
+            clearTimeout(timerForVideoStreamTimeout);
+            $video.pause();
+        }
+        upcomingTypeIconTitle = newStreamType;
+        /* Start JPEG image load */
+        showStillImage();
+        /* Start new stream */
         if (newStreamType == 'HLS Playback') {
             blockVideoPlayback = false;
             favorNativePlayback = false;
@@ -463,9 +495,6 @@
             }, 2000);
         } else { 
             blockVideoPlayback = true;
-            $video.pause();
-            create.hls.stopLoad();
-            showStillImage();
         }
         menuDropdownArea.style.display = 'none';
     }   
