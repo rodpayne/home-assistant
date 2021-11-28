@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
         body {
             overflow: hidden;
         }
+
         #video {
             width: 100%;
             height: auto;
@@ -17,6 +19,7 @@
             top: 0;
             left: 0;
         }
+
         #stillImage {
             width: 100%;
             height: auto;
@@ -26,29 +29,34 @@
             top: 0;
             left: 0;
         }
+
         #buttonArea {
             position: fixed;
             top: 4px;
             left: 4px;
             color: white;
-            background: rgba(128,128,128,0.25);
+            background: rgba(128, 128, 128, 0.25);
             border-radius: 3px;
             padding: 8px;
         }
+
         #typeIconArea {
             position: fixed;
             top: 8px;
             right: 4px;
-            width:24px; 
-            height:24px;
-            background: rgba(255,255,0,0.25);
+            width: 24px;
+            height: 24px;
+            background: rgba(255, 255, 0, 0.25);
             border-radius: 3px;
         }
+
         #typeIcon {
-            width:24px;
-            height:24px;
-            background: rgba(128,128,128,0.25);;
+            width: 24px;
+            height: 24px;
+            background: rgba(128, 128, 128, 0.25);
+            ;
         }
+
         #menuDropdownArea {
             position: fixed;
             top: 34px;
@@ -56,31 +64,38 @@
             width: auto;
             height: auto;
         }
+
         .menuButton {
             border: 1px solid #73AD21;
             border-radius: 3px;
-            background: rgb(144,238,144);
+            background: rgb(144, 238, 144);
             margin-top: 1px;
         }
+
         button.menuButton:hover {
             border: 2px solid green;
         }
+
         button.menuButton:disabled {
             border: 1px solid #73AD21;
-               background: rgba(144,238,144,0.9);
+            background: rgba(144, 238, 144, 0.9);
         }
+
         #typeLabel {
             color: white;
             font-size: 120%;
         }
+
         .actionButton {
             border: 1px solid #73AD21;
             border-radius: 3px;
-            background: rgba(144,238,144,0.5);
+            background: rgba(144, 238, 144, 0.5);
         }
+
         button.actionButton:hover {
             border: 2px solid green;
         }
+
         #messageArea {
             color: black;
             background: yellow;
@@ -91,7 +106,7 @@
 </head>
 
 <body>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@v1.1.1"></script>
     <div>
         <div id="messageArea"></div>
         <video id="video" autoplay muted playsinline></video>
@@ -100,467 +115,496 @@
             <img id="typeIcon" src="/local/outline_refresh_white_24dp.png" title="Loading">
         </div>
         <div id="menuDropdownArea" style="display: none;">
-            <button id="LatestJpegButton" class="menuButton" onclick="changeStream(this.innerHTML);">Latest JPEG</button>
-            <br><button id="HLSPlaybackButton" class="menuButton" onclick="changeStream(this.innerHTML);">HLS Playback</button>
-            <br><button id="NativePlaybackButton" class="menuButton" onclick="changeStream(this.innerHTML);">Native Playback</button>
-        </div>   
+            <button id="LatestJpegButton" class="menuButton" onclick="changeStream(this.innerHTML);">Latest
+                JPEG</button>
+            <br><button id="HLSPlaybackButton" class="menuButton" onclick="changeStream(this.innerHTML);">HLS
+                Playback</button>
+            <br><button id="NativePlaybackButton" class="menuButton" onclick="changeStream(this.innerHTML);">Native
+                Playback</button>
+        </div>
         <div id="buttonArea">
             <span id="typeLabel"></span>
             <button id="mute" class="actionButton" style="display: none;" value="muted">Unmute</button>
-            <button id="frontDoorbell" class="actionButton" style="display: none;" onclick="changeCamera(this.value,true,true);"  value="front_doorbell">Front Doorbell</button>
-            <button id="frontPorch"    class="actionButton" style="display: none;" onclick="changeCamera(this.value,false,false);" value="front_porch">Front Porch</button>
-            <button id="sideGate"      class="actionButton" style="display: none;" onclick="changeCamera(this.value,true,false);"  value="side_gate">Side Gate</button>
+            <button id="frontDoorbell" class="actionButton" style="display: none;"
+                onclick="changeCamera(this.value,true,true);" value="front_doorbell">Front Doorbell</button>
+            <button id="frontPorch" class="actionButton" style="display: none;"
+                onclick="changeCamera(this.value,false,false);" value="front_porch">Front Porch</button>
+            <button id="sideGate" class="actionButton" style="display: none;"
+                onclick="changeCamera(this.value,true,false);" value="side_gate">Side Gate</button>
         </div>
     </div>
     <script>
-/*******************************************************************************
+        /*******************************************************************************
+        
+            This page displays the video from a security camera.  It uses a variety of 
+            technologies to find the one that will work best in a particular browser.
+            1. `Latest JPEG` pulled from Frigate, repeated until one of the following 
+                videos successfully plays.
+            2. `HLS Playback` HLS stream played using hls.js.
+            3. `Native Playback` HLS stream played using the browser's native support for 
+               `application/vnd.apple.mpegurl` stream.  Note that this currently fails
+               for iPhones with software version 14+, so `Latest JPEG` continues to be
+               shown. *Working again on 14.8+ and maybe it started working earlier.* 
+               
+            `allow_unmute`        - option to show a mute/unmute button to turn audio on/off.
+            `camera_name`         - name of a particular camera to select.
+            `delay_time`          - millisecond delay between loading JPEG pictures.
+            `frigate_server`      - location of the Frigate server for JPEG source.
+            `hls_server`          - location of the proxy server for HLS stream.
+            `inherent_latency`    - hlsSegmentDuration * hlsSegmentCount.
+            `scroll_down`         - option to initially scroll the video down. 
+            `statistics_interval` - minutes between logging of statistics.
+            `title`               - label to be shown on the video.
+        
+        *******************************************************************************/
+        const CARDNAME = "camera_video.html";
+        const VERSION = "2021-11-27 I";
 
-    This page displays the video from a security camera.  It uses a variety of 
-    technologies to find the one that will work best in a particular browser.
-    1. `Latest JPEG` pulled from Frigate, repeated until one of the following 
-        videos successfully plays.
-    2. `HLS Playback` HLS stream played using hls.js.
-    3. `Native Playback` HLS stream played using the browser's native support for 
-       `application/vnd.apple.mpegurl` stream.  Note that this currently fails
-       for iPhones with software version 14+, so `Latest JPEG` continues to be
-       shown. *Working again on 14.8+ and maybe it started working earlier.* 
-       
-    `allow_unmute`        - option to show a mute/unmute button to turn audio on/off.
-    `camera_name`         - name of a particular camera to select.
-    `delay_time`          - millisecond delay between loading JPEG pictures.
-    `frigate_server`      - location of the Frigate server for JPEG source.
-    `hls_server`          - location of the proxy server for HLS stream.
-    `inherent_latency`    - hlsSegmentDuration * hlsSegmentCount.
-    `statistics_interval` - minutes between logging of statistics.
-    `title`               - label to be shown on the video.
-    `scroll_down`         - option to initially scroll the video down. 
+        //    const debugOnScreen = navigator.userAgent.includes('iPhone;');    // (I have been trying to debug HLS on iPhone)
+        const debugOnScreen = false;
 
-*******************************************************************************/
-    const CARDNAME = "camera_video.html";
-    const VERSION = "2021-11-25";
-    
-//    const debugOnScreen = navigator.userAgent.includes('iPhone;');    // (I have been trying to debug HLS on iPhone)
-    const debugOnScreen = false;
-    
-    console.info("%c %s %c %s",
-      "color: white; background: forestgreen; font-weight: 700;",
-      CARDNAME.toUpperCase(),
-      "color: forestgreen; background: white; font-weight: 700;",
-      VERSION,
-    );
+        console.info("%c %s %c %s",
+            "color: white; background: forestgreen; font-weight: 700;",
+            CARDNAME.toUpperCase(),
+            "color: forestgreen; background: white; font-weight: 700;",
+            VERSION,
+        );
 
-    function refresh() {    
-        setTimeout(function () {
-            location.reload()
-        }, 100);
-    }
-    
-    function getQueryVariable(variable)
-    {
-        var query = window.location.search.substring(1);
-        var vars = query.split("&");
-        for (var i=0;i<vars.length;i++) {
+        function refresh() {
+            setTimeout(function () {
+                location.reload()
+            }, 1000);
+        }
+
+        function getQueryVariable(variable) {
+            var query = window.location.search.substring(1);
+            var vars = query.split("&");
+            for (var i = 0; i < vars.length; i++) {
                 var pair = vars[i].split("=");
-                if(pair[0] == variable){return pair[1];}
-        }
-        return(false);
-    }
-    var allowUnmute = getQueryVariable('allow_unmute');
-    var cameraName = getQueryVariable('camera_name') || 'front_doorbell';
-    const cameraServer = getQueryVariable('hls_server') || 'http://172.19.54.7:8888';
-    const statisticsInterval = parseInt(getQueryVariable('statistics_interval') || '10');
-    const stillImageDelayTime = parseInt(getQueryVariable('delay_time') || '1000');
-    const frigateServer = getQueryVariable('frigate_server') || 'http://172.19.54.77:5000';
-    const title = getQueryVariable('title');
-    var scrollDown = getQueryVariable('scroll_down');
-    const inherentHlsLatency = parseInt(getQueryVariable('inherent_latency') || '1.5');
-
-    const $video = document.getElementById('video');
-    const $stillImage = document.getElementById('stillImage');
-    const $messageArea = document.getElementById('messageArea');
-    const $typeIcon = document.getElementById('typeIcon');
-    const $muteButton = document.getElementById('mute');
-
-    
-    var message;
-    var upcomingTypeIconSource = "/local/outline_refresh_white_24dp.png"
-    var upcomingTypeIconTitle = "Latest JPEG"
-    
-    function logMessage(message) {
-        console.debug((new Date).toLocaleString('en-US').replace(',','') + ' - ' + cameraName + ' - ' + $typeIcon.title + ' - ' + message);
-    }
-    
-    const supportsLatestJPEG = true;
-    const supportsHLSPlayback = Hls.isSupported();
-    const supportsNativePlayback = $video.canPlayType('application/vnd.apple.mpegurl');
-    
-    const $latestJpeg = document.getElementById('LatestJpegButton');
-    const $hlsPlayback = document.getElementById('HLSPlaybackButton');
-    const $NativePlayback = document.getElementById('NativePlaybackButton');
-
-    $latestJpeg.disabled = ! supportsLatestJPEG;
-    $hlsPlayback.disabled = ! supportsHLSPlayback;
-    $NativePlayback.disabled = ! supportsNativePlayback;
-    
-    var countImageLoads = 0;
-    var countHLSLoads = 0;
-    var countHLSErrors = 0
-    var countVideoStreamTimeouts = 0;
-    var countVideoSkips = 0;
-
-    function logStatistics () {
-        logMessage("countVideoStreamTimeouts = " + countVideoStreamTimeouts + "; countImageLoads = " + countImageLoads + "; countHLSLoads = " + countHLSLoads + "; countHLSErrors = " + countHLSErrors + "; countVideoSkips = " + countVideoSkips);
-    }
-    setInterval(logStatistics, statisticsInterval * 60 * 1000);
-    
-/*******************************************************************************
-    Start the JPEG image loads
-*******************************************************************************/
-
-    function scrollDownIfNeeded () {
-        element = document.scrollingElement;
-        if (scrollDown) {
-            var scrollOptions = {
-                top: 99999,
-                behavior: 'smooth'
+                if (pair[0] == variable) { return pair[1]; }
             }
-            element.scrollTo(scrollOptions);
-        } else {
-            element.scrollTo(0, 0); 
+            return (false);
         }
-    }
+        var allowUnmute = getQueryVariable('allow_unmute');
+        var cameraName = getQueryVariable('camera_name') || 'front_doorbell';
+        const cameraServer = getQueryVariable('hls_server') || 'http://172.19.54.7:8888';
+        const statisticsInterval = parseInt(getQueryVariable('statistics_interval') || '10');
+        const stillImageDelayTime = parseInt(getQueryVariable('delay_time') || '1000');
+        const frigateServer = getQueryVariable('frigate_server') || 'http://172.19.54.77:5000';
+        const title = getQueryVariable('title');
+        var scrollDown = getQueryVariable('scroll_down');
+        const inherentHlsLatency = parseInt(getQueryVariable('inherent_latency') || '1.5');
 
-    var stillImageSource;
-    var loadingFirstImage;
+        const $video = document.getElementById('video');
+        const $stillImage = document.getElementById('stillImage');
+        const $messageArea = document.getElementById('messageArea');
+        const $typeIcon = document.getElementById('typeIcon');
+        const $muteButton = document.getElementById('mute');
 
-    function refreshStillImage () {
-        if ($typeIcon.title == "Latest JPEG") {
-            $stillImage.src = stillImageSource + '?cache=' + Number(new Date());
-        }
-    } 
-    
-    $stillImage.onload = function() {
-        logMessage("JPEG load complete");
-        countImageLoads++
-        if (loadingFirstImage) {
-            loadingFirstImage = false;
-            scrollDownIfNeeded ();        
-        }
-        setTimeout(refreshStillImage, stillImageDelayTime);
-    }
 
-    function showStillImage () {
-        logMessage('showStillImage()');
-        stillImageSource = frigateServer + '/api/' + cameraName + '/latest.jpg';
-        $video.style.display = 'none';
-        $stillImage.style.display = 'block';
-        $typeIcon.src="/local/outline_photo_camera_white_24dp.png";
-        $typeIcon.title="Latest JPEG";
-        $muteButton.style.display = 'none'; 
-        
-        var friendlyName = cameraName.replace('_',' ').split(' ');
-        for (let i = 0; i < friendlyName.length; i++) {
-            friendlyName[i] = friendlyName[i][0].toUpperCase() + friendlyName[i].substr(1);
-        }
-        friendlyName = friendlyName.join(' ');
-        document.title = friendlyName;
+        var message;
+        var upcomingTypeIconSource = "/local/outline_refresh_white_24dp.png"
+        var upcomingTypeIconTitle = "Latest JPEG"
 
-        if (title == 'camera_name') {
-            document.getElementById('typeLabel').innerHTML = cameraName;
-        } else if (title === 'friendly_name') {
-            document.getElementById('typeLabel').innerHTML = friendlyName;
-        } else if (`${title}` !== `${false}`) {
-            document.getElementById('typeLabel').innerHTML = decodeURI(title);
-        }
-                
-        loadingFirstImage = true;
-        refreshStillImage();
-        
-    }
-   
-    showStillImage();
+        const levelDebug = 'D';
+        const levelInfo = 'I';
+        const levelWarning = 'W';
+        const levelError = 'E'
 
-/*******************************************************************************
-    Start the video stream if possible
-    See https://www.npmjs.com/package/hls.js/v/canary
-    See https://github.com/video-dev/hls.js/blob/master/docs/API.md
-*******************************************************************************/
+        function logMessage(message, level = levelDebug) {
+            let logInfo = (new Date).toLocaleString('en-US').replace(',', '') + ' - ' + cameraName + ' - ' + $typeIcon.title + ' - ' + message;
+            switch (level) {
+                case levelDebug:
+                    console.debug(logInfo);
+                    break;
+                case levelInfo:
+                    console.info(logInfo);
+                    break;
+                case levelWarning:
+                    console.warning(logInfo);
+                    break;
+                case levelError:
+                    console.error(logInfo);
+                    break;
+                default:
+                    console.debug(logInfo);
+            }
+        }
 
-    var loadingFirstVideoFrame;
-    var blockVideoPlayback = false;
-    var favorNativePlayback = false;
-    var timerForVideoStreamTimeout = null;
-    
-    function videoStreamTimedOut () {
-        logMessage("videoStreamTimedOut()");
-        countVideoStreamTimeouts++;
-        logStatistics();
-//        changeStream(upcomingTypeIconTitle);
-        refresh();
-    }
-    
-    function restartTimerForVideoStreamTimeout () {
-        clearTimeout(timerForVideoStreamTimeout);
-        timerForVideoStreamTimeout = setTimeout(videoStreamTimedOut, 60000);
-    }
-    
-    function create () {
-        if (blockVideoPlayback) {
-            logMessage('Video playback blocked.');
-            return;
+        const supportsLatestJPEG = true;
+        const supportsHLSPlayback = Hls.isSupported();
+        const supportsNativePlayback = $video.canPlayType('application/vnd.apple.mpegurl');
+
+        const $latestJpeg = document.getElementById('LatestJpegButton');
+        const $hlsPlayback = document.getElementById('HLSPlaybackButton');
+        const $NativePlayback = document.getElementById('NativePlaybackButton');
+
+        $latestJpeg.disabled = !supportsLatestJPEG;
+        $hlsPlayback.disabled = !supportsHLSPlayback;
+        $NativePlayback.disabled = !supportsNativePlayback;
+
+        var countImageLoads = 0;
+        var countHLSLoads = 0;
+        var countHLSErrors = 0
+        var countVideoStreamTimeouts = 0;
+        var countVideoSkips = 0;
+
+        function logStatistics() {
+            logMessage("countVideoStreamTimeouts = " + countVideoStreamTimeouts + "; countImageLoads = " + countImageLoads + "; countHLSLoads = " + countHLSLoads + "; countHLSErrors = " + countHLSErrors + "; countVideoSkips = " + countVideoSkips, levelInfo);
         }
-        const videoSrc = cameraServer + '/' + cameraName + '/stream.m3u8';
-        message = 'Video source = ' + videoSrc;
-        logMessage(message);
-        if (debugOnScreen) {
-            $messageArea.innerHTML += message + '<br>';
-            $messageArea.style.display = "block";
+        setInterval(logStatistics, statisticsInterval * 60 * 1000);
+
+        /*******************************************************************************
+            Start the JPEG image loads
+        *******************************************************************************/
+
+        function scrollDownIfNeeded() {
+            element = document.scrollingElement;
+            if (scrollDown) {
+                var scrollOptions = {
+                    top: 99999,
+                    behavior: 'smooth'
+                }
+                element.scrollTo(scrollOptions);
+            } else {
+                element.scrollTo(0, 0);
+            }
         }
-        
-        if ( (Hls.isSupported()) && (!favorNativePlayback || !supportsNativePlayback) ) {
-            upcomingTypeIconSource = "/local/outline_videocam_white_24dp.png";
-            upcomingTypeIconTitle = "HLS Playback";
-            message = 'HLS ' + Hls.version + ' play video...';
+
+        var stillImageSource;
+        var loadingFirstImage;
+
+        function refreshStillImage() {
+            if ($typeIcon.title == "Latest JPEG") {
+                $stillImage.src = stillImageSource + '?cache=' + Number(new Date());
+            }
+        }
+
+        $stillImage.onload = function () {
+            logMessage("JPEG load complete");
+            countImageLoads++
+            if (loadingFirstImage) {
+                loadingFirstImage = false;
+                scrollDownIfNeeded();
+            }
+            setTimeout(refreshStillImage, stillImageDelayTime);
+        }
+
+        function showStillImage() {
+            logMessage('showStillImage()');
+            stillImageSource = frigateServer + '/api/' + cameraName + '/latest.jpg';
+            $video.style.display = 'none';
+            $stillImage.style.display = 'block';
+            $typeIcon.src = "/local/outline_photo_camera_white_24dp.png";
+            $typeIcon.title = "Latest JPEG";
+            $muteButton.style.display = 'none';
+
+            var friendlyName = cameraName.replace('_', ' ').split(' ');
+            for (let i = 0; i < friendlyName.length; i++) {
+                friendlyName[i] = friendlyName[i][0].toUpperCase() + friendlyName[i].substr(1);
+            }
+            friendlyName = friendlyName.join(' ');
+            document.title = friendlyName;
+
+            if (title == 'camera_name') {
+                document.getElementById('typeLabel').innerHTML = cameraName;
+            } else if (title === 'friendly_name') {
+                document.getElementById('typeLabel').innerHTML = friendlyName;
+            } else if (`${title}` !== `${false}`) {
+                document.getElementById('typeLabel').innerHTML = decodeURI(title);
+            }
+
+            loadingFirstImage = true;
+            refreshStillImage();
+
+        }
+
+        showStillImage();
+
+        /*******************************************************************************
+            Start the video stream if possible
+            See https://www.npmjs.com/package/hls.js/v/canary
+            See https://github.com/video-dev/hls.js/blob/master/docs/API.md
+        *******************************************************************************/
+
+        var loadingFirstVideoFrame;
+        var blockVideoPlayback = false;
+        var favorNativePlayback = false;
+        var timerForVideoStreamTimeout = null;
+        var previousVideoTime = 0;
+        var countVideoRepeats = 0;
+
+        function videoStreamTimedOut() {
+            logMessage("videoStreamTimedOut()");
+            countVideoStreamTimeouts++;
+            logStatistics();
+            changeStream(upcomingTypeIconTitle);
+        }
+
+        function restartTimerForVideoStreamTimeout() {
+            clearTimeout(timerForVideoStreamTimeout);
+            timerForVideoStreamTimeout = setTimeout(videoStreamTimedOut, 60000);
+        }
+
+        function create() {
+            if (blockVideoPlayback) {
+                logMessage('Video playback blocked.');
+                return;
+            }
+            const videoSrc = cameraServer + '/' + cameraName + '/stream.m3u8';
+            message = 'Video source = ' + videoSrc;
             logMessage(message);
             if (debugOnScreen) {
                 $messageArea.innerHTML += message + '<br>';
                 $messageArea.style.display = "block";
             }
-            if (typeof create.hls == 'undefined') {
-                create.hls = new Hls({
-                    debug: false,
-                    lowLatencyMode: true,
-                    maxLiveSyncPlaybackRate: 1.5,
-                    progressive: false,
-                    xhrSetup: function (xhr, url) {
-                                xhr.addEventListener("load", event => { 
-                                    if ( (event.loaded > 0) && (url.endsWith(".ts")) ) {
-                                        var currentDelay = ($video.duration - $video.currentTime).toFixed(3);
-                                        logMessage("HLS load complete: transferred = " + event.loaded + "; delay = " + currentDelay );
-                                        if (currentDelay >= 600) {
-                                            videoStreamTimedOut();                                        
-                                        } else if (currentDelay >= (inherentHlsLatency * 2)) {
-                                            $video.currentTime = $video.duration - inherentHlsLatency;
-                                            countVideoSkips++;
-                                        }
+
+            if ((Hls.isSupported()) && (!favorNativePlayback || !supportsNativePlayback)) {
+                upcomingTypeIconSource = "/local/outline_videocam_white_24dp.png";
+                upcomingTypeIconTitle = "HLS Playback";
+                message = 'HLS ' + Hls.version + ' play video...';
+                logMessage(message);
+                if (debugOnScreen) {
+                    $messageArea.innerHTML += message + '<br>';
+                    $messageArea.style.display = "block";
+                }
+                if (typeof create.hls == 'undefined') {
+                    create.hls = new Hls({
+                        debug: false,
+                        lowLatencyMode: true,
+                        maxLiveSyncPlaybackRate: 1.5,
+                        progressive: false,
+                        xhrSetup: function (xhr, url) {
+                            xhr.addEventListener("load", event => {
+                                if ((event.loaded > 18) && (url.endsWith(".ts"))) {
+                                    var currentDelay = ($video.duration - $video.currentTime).toFixed(3);
+                                    logMessage("HLS load complete: transferred = " + event.loaded + "; delay = " + currentDelay);
+                                    if ($video.currentTime != previousVideoTime) {
+                                        countVideoRepeats = 0;
                                         countHLSLoads++;
                                         restartTimerForVideoStreamTimeout();
-                                        if ( (loadingFirstVideoFrame) || ($stillImage.style.display == 'block') ) {
+                                        if ((loadingFirstVideoFrame) || ($stillImage.style.display == 'block')) {
                                             showVideoInsteadOfImage();
                                         }
+                                    } else {
+                                        /* handle case where HLS stream is stuck... switch to Latest JPEG */
+                                        countVideoRepeats++;
+                                        if (countVideoRepeats > 60) {
+                                            logMessage("Video stream time is not advancing...", levelError)
+                                            videoStreamTimedOut()
+                                        }
                                     }
-                                }, false);
-                    },                   
-                });
-            }
-            
-            create.hls.on(Hls.Events.ERROR, (evt, data) => {
-                logMessage("Hls.Events.ERROR: type=" + data.type + "; details=" + data.details + "; fatal=" + data.fatal);
-                countHLSErrors++;
-                if (data.fatal) {
-                    showStillImage();
-                    
-                    switch (data.type) {
-                    case Hls.ErrorTypes.NETWORK_ERROR:
-                        // try to recover network error
-                        logMessage('fatal network error encountered, try to recover');
-                        create.hls.startLoad();
-                        break;
-                    case Hls.ErrorTypes.MEDIA_ERROR:
-                        logMessage('fatal media error encountered, try to recover');
-                        create.hls.recoverMediaError();
-                        break;
-                    default:
-                        // cannot recover
-                        create.hls.destroy();
-                        
-                        setTimeout(() => {
-                            create();
-                        }, 2000);
-                        break;
-                    }
-                } else {
-    //                changeStream(upcomingTypeIconTitle);
+                                }
+                            }, false);
+                        },
+                    });
                 }
-            });
 
-            create.hls.loadSource(videoSrc);
-            create.hls.attachMedia($video);
+                create.hls.on(Hls.Events.ERROR, (evt, data) => {
+                    logMessage("Hls.Events.ERROR: type=" + data.type + "; details=" + data.details + "; fatal=" + data.fatal);
+                    countHLSErrors++;
+                    if (data.fatal) {
+                        showStillImage();
 
-        } else if (supportsNativePlayback) {
-            upcomingTypeIconSource = "/local/outline_live_tv_white_24dp.png";
-            upcomingTypeIconTitle = "Native Playback";
-            message = 'Native play video...';
-            logMessage(message);
-            if (debugOnScreen) {
-                $messageArea.innerHTML += message + '<br>';
-                $messageArea.style.display = "block";
+                        switch (data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                // try to recover network error
+                                logMessage('fatal network error encountered, try to recover');
+                                create.hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                logMessage('fatal media error encountered, try to recover');
+                                create.hls.recoverMediaError();
+                                break;
+                            default:
+                                // cannot recover
+                                create.hls.destroy();
+
+                                setTimeout(() => {
+                                    create();
+                                }, 2000);
+                                break;
+                        }
+                    }
+                });
+
+                create.hls.loadSource(videoSrc);
+                create.hls.attachMedia($video);
+
+            } else if (supportsNativePlayback) {
+                upcomingTypeIconSource = "/local/outline_live_tv_white_24dp.png";
+                upcomingTypeIconTitle = "Native Playback";
+                message = 'Native play video...';
+                logMessage(message);
+                if (debugOnScreen) {
+                    $messageArea.innerHTML += message + '<br>';
+                    $messageArea.style.display = "block";
+                }
+                $video.src = videoSrc;
+            } else {
+                message = "Can't play video in this browser.";
+                upcomingTypeIconSource = "/local/outline_videocam_off_white_24dp.png";
+                upcomingTypeIconTitle = "Can't Play Video";
+                logMessage(message, levelError);
+                if (debugOnScreen) {
+                    $messageArea.innerHTML += message + '<br>';
+                    $messageArea.style.display = "block";
+                }
             }
-            $video.src = videoSrc;
-        } else {
-            message = "Can't play video in this browser.";
-            upcomingTypeIconSource = "/local/outline_videocam_off_white_24dp.png";
-            upcomingTypeIconTitle = "Can't Play Video";
-            logMessage(message);
-            if (debugOnScreen) {
-                $messageArea.innerHTML += message + '<br>';
-                $messageArea.style.display = "block";
-            }
-        }
-        loadingFirstVideoFrame = true;            
-        $video.play();
-    }
-        
-    function showVideoInsteadOfImage () {
-        logMessage('showVideoInsteadOfImage()');
-        $typeIcon.src = upcomingTypeIconSource;
-        $typeIcon.title = upcomingTypeIconTitle;
-        typeIconArea.style.background = 'rgba(128,128,128,0.5)';
-        if ( ($stillImage.style.display != 'none') && (! loadingFirstImage) ) {
-            $video.style.height = $stillImage.clientHeight;
-        }
-        $video.style.display = 'block';
-        $messageArea.style.display = "none";
-        $stillImage.style.display = 'none';
-        if (allowUnmute) {
-            $muteButton.style.display = 'inline'; 
-        }
-        if (loadingFirstVideoFrame) {
-            loadingFirstVideoFrame = false;
-            scrollDownIfNeeded();
-        }
-        if (upcomingTypeIconTitle == "HLS Playback") {
-            restartTimerForVideoStreamTimeout();
-        }
-    }
-        
-/*******************************************************************************
-    video event listeners
-    See https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement#events
-    See https://www.w3.org/2010/05/video/mediaevents.html
-*******************************************************************************/
-
-    $video.addEventListener('playing', (event) => {
-        logMessage('Video is playing.');
-        if (loadingFirstVideoFrame) {
-            showVideoInsteadOfImage();
-        }
-    });
-
-    $video.addEventListener('stalled', (event) => {
-        logMessage('Video failed to fetch data, but trying.');
-    });
-
-    $video.addEventListener('error', () => {
-        console.error(`Video error loading: ${cameraName}`);
-    });
-
-    $video.addEventListener('waiting', (event) => {
-        logMessage('Video is waiting for more data.');
-    });
-
-/*******************************************************************************
-    document event listeners
-    See https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilitychange_event
-*******************************************************************************/
-        
-    document.addEventListener("visibilitychange", function() {
-      if (document.visibilityState === 'visible') {
-        logMessage('Resume');
-        if ($typeIcon.title == "Latest JPEG") {
-            refreshStillImage();
-        } else if ($typeIcon.title == "HLS Playback") {
             loadingFirstVideoFrame = true;
             $video.play();
-            create.hls.startLoad();
-            restartTimerForVideoStreamTimeout();
-        } else {
-            loadingFirstVideoFrame = true;
-            $video.play();
-            restartTimerForVideoStreamTimeout();
         }
-      } else {
-        logMessage('Pause');
-        clearTimeout(timerForVideoStreamTimeout);
-        $video.pause();
-        create.hls.stopLoad();
-      }
-    });
 
-/*******************************************************************************
-    other page element events
-*******************************************************************************/
+        function showVideoInsteadOfImage() {
+            logMessage('showVideoInsteadOfImage()');
+            $typeIcon.src = upcomingTypeIconSource;
+            $typeIcon.title = upcomingTypeIconTitle;
+            typeIconArea.style.background = 'rgba(128,128,128,0.5)';
+            if (($stillImage.style.display != 'none') && (!loadingFirstImage)) {
+                $video.style.height = $stillImage.clientHeight;
+            }
+            $video.style.display = 'block';
+            $messageArea.style.display = "none";
+            $stillImage.style.display = 'none';
+            if (allowUnmute) {
+                $muteButton.style.display = 'inline';
+            }
+            if (loadingFirstVideoFrame) {
+                loadingFirstVideoFrame = false;
+                scrollDownIfNeeded();
+            }
+            if (upcomingTypeIconTitle == "HLS Playback") {
+                restartTimerForVideoStreamTimeout();
+            }
+        }
 
-    $typeIcon.addEventListener('click', () => {
-        if (menuDropdownArea.style.display !== 'none') {
+        /*******************************************************************************
+            video event listeners
+            See https://developer.mozilla.org/en-US/docs/Web/API/HTMLMediaElement#events
+            See https://www.w3.org/2010/05/video/mediaevents.html
+        *******************************************************************************/
+
+        $video.addEventListener('playing', (event) => {
+            logMessage('Video is playing.');
+            if (loadingFirstVideoFrame) {
+                showVideoInsteadOfImage();
+            }
+        });
+
+        $video.addEventListener('stalled', (event) => {
+            logMessage('Video failed to fetch data, but trying.', levelWarning);
+        });
+
+        $video.addEventListener('error', () => {
+            console.error(`Video error loading: ${cameraName}`, levelError);
+        });
+
+        $video.addEventListener('waiting', (event) => {
+            logMessage('Video is waiting for more data.');
+        });
+
+        /*******************************************************************************
+            document event listeners
+            See https://developer.mozilla.org/en-US/docs/Web/API/Document/visibilitychange_event
+        *******************************************************************************/
+
+        document.addEventListener("visibilitychange", function () {
+            if (document.visibilityState === 'visible') {
+                logMessage('Resume');
+                if ($typeIcon.title == "Latest JPEG") {
+                    refreshStillImage();
+                } else if ($typeIcon.title == "HLS Playback") {
+                    loadingFirstVideoFrame = true;
+                    $video.play();
+                    create.hls.startLoad();
+                    restartTimerForVideoStreamTimeout();
+                } else {
+                    loadingFirstVideoFrame = true;
+                    $video.play();
+                    restartTimerForVideoStreamTimeout();
+                }
+            } else {
+                logMessage('Pause');
+                clearTimeout(timerForVideoStreamTimeout);
+                $video.pause();
+                create.hls.stopLoad();
+            }
+        });
+
+        /*******************************************************************************
+            other page element events
+        *******************************************************************************/
+
+        $typeIcon.addEventListener('click', () => {
+            if (menuDropdownArea.style.display !== 'none') {
+                menuDropdownArea.style.display = 'none';
+            } else {
+                menuDropdownArea.style.display = 'block';
+            }
+        });
+
+        function changeStream(newStreamType) {
+            logMessage('Change Stream to "' + newStreamType + '"');
+            /* Stop previous stream */
+            if (upcomingTypeIconTitle = "HLS Playback") {
+                clearTimeout(timerForVideoStreamTimeout);
+                $video.pause();
+                create.hls.stopLoad();
+            } else if (upcomingTypeIconTitle = "Native Playback") {
+                clearTimeout(timerForVideoStreamTimeout);
+                $video.pause();
+            }
+            upcomingTypeIconTitle = newStreamType;
+            /* Start JPEG image load */
+            showStillImage();
+            /* Start new stream */
+            if (newStreamType == 'HLS Playback') {
+                blockVideoPlayback = false;
+                favorNativePlayback = false;
+                setTimeout(() => {
+                    create();
+                }, 2000);
+            } else if (newStreamType == 'Native Playback') {
+                blockVideoPlayback = false;
+                favorNativePlayback = true;
+                setTimeout(() => {
+                    create();
+                }, 2000);
+            } else {
+                blockVideoPlayback = true;
+            }
             menuDropdownArea.style.display = 'none';
-        } else {
-            menuDropdownArea.style.display = 'block';
         }
-    });
 
-    function changeStream (newStreamType) {
-        logMessage('Change Stream to "' + newStreamType + '"');
-        /* Stop previous stream */
-        if (upcomingTypeIconTitle = "HLS Playback") {
-            clearTimeout(timerForVideoStreamTimeout);
-            $video.pause();
-            create.hls.stopLoad();
-        } else if (upcomingTypeIconTitle = "Native Playback") {
-            clearTimeout(timerForVideoStreamTimeout);
-            $video.pause();
-        }
-        upcomingTypeIconTitle = newStreamType;
-        /* Start JPEG image load */
-        showStillImage();
-        /* Start new stream */
-        if (newStreamType == 'HLS Playback') {
-            blockVideoPlayback = false;
-            favorNativePlayback = false;
-            setTimeout(() => {
+        $muteButton.addEventListener('click', () => {
+            if ($muteButton.value === 'unmuted') {
+                $muteButton.value = 'muted';
+                $muteButton.innerHTML = 'Unmute';
+                $video.muted = true;
+            } else {
+                $muteButton.value = 'unmuted';
+                $muteButton.innerHTML = 'Mute';
+                $video.muted = false;
+            }
+        });
+
+        function changeCamera(newCamera, newScrollDown = false, newAllowUnmute) {
+            scrollDown = newScrollDown;
+            allowMute = newAllowUnmute;
+            if (newCamera != cameraName) {
+                cameraName = newCamera;
+                showStillImage;
                 create();
-            }, 2000);
-        } else if (newStreamType == 'Native Playback') {
-            blockVideoPlayback = false;
-            favorNativePlayback = true;
-            setTimeout(() => {
-                create();
-            }, 2000);
-        } else { 
-            blockVideoPlayback = true;
+            } else {
+                $video.pause()
+                setTimeout(() => {
+                    $video.play();
+                }, 500);
+            }
         }
-        menuDropdownArea.style.display = 'none';
-    }   
-        
-    $muteButton.addEventListener('click', () => {
-        if ($muteButton.value === 'unmuted') {
-            $muteButton.value = 'muted';
-            $muteButton.innerHTML = 'Unmute';
-            $video.muted = true;
-        } else {
-            $muteButton.value = 'unmuted';
-            $muteButton.innerHTML = 'Mute';
-            $video.muted = false;
-        }
-    });
 
-    function changeCamera (newCamera,newScrollDown = false,newAllowUnmute) {
-        scrollDown = newScrollDown;
-        allowMute = newAllowUnmute;
-        if (newCamera != cameraName) {
-            cameraName = newCamera;
-            showStillImage;
-            create();
-        } else {
-            $video.pause()
-            setTimeout(() => {
-                $video.play();
-            }, 500);
-        }
-    }
-
-    logMessage('Ready to start video');
-    create();
+        logMessage('Ready to start video');
+        create();
 
     </script>
 
