@@ -64,7 +64,7 @@ automation:
               - condition: template
                 value_template: "{{ states('sensor.updater_hassos') == 'on' }}"
               - condition: template
-                value_template: "{{ (states('sensor.updater_supervisor') | float) != 0 }}"
+                value_template: "{{ (states('sensor.updater_supervisor') | float(0)) != 0 }}"
               - condition: template
                 value_template: "{{ (states('sensor.hacs') | float(0)) != 0 }}"
           sequence:
@@ -85,7 +85,7 @@ automation:
                 {% endif %}
 
                 {% set supervisor_entity_id = 'sensor.updater_supervisor' %}
-                {% if (states(supervisor_entity_id) | float) != 0 %}
+                {% if (states(supervisor_entity_id) | float(0)) != 0 %}
                 [Add-ons](/hassio/dashboard)
                   {% for addon in state_attr(supervisor_entity_id, 'addons') %}
                 * [**{{ addon.name }}**](/hassio/addon/{{ addon["slug"] }}/info) {{ addon["version"] }} -> {{ addon["version_latest"] }}
@@ -93,7 +93,7 @@ automation:
                 {% endif %}
 
                 {% set hacs_entity_id = 'sensor.hacs' %}
-                {% if (states(hacs_entity_id) | float) != 0 %}
+                {% if (states(hacs_entity_id) | float(0)) != 0 %}
                 [HACS](/hacs/entry)
                   {% for repo in state_attr(hacs_entity_id, 'repositories') %}
                 * **{{ repo.display_name }}** {{ repo["installed_version"] }} -> {{ repo["available_version"] }}
