@@ -75,7 +75,7 @@ automation:
                 {% set core_entity_id = 'sensor.updater_core' %}
                 {% set os_entity_id = 'sensor.updater_hassos' %}
                 {% if states(core_entity_id) == 'on' or states(os_entity_id) == 'on' %}
-                [Home Assistant](/hassio/dashboard)
+                [Home Assistant](/config/dashboard)
                   {% if states(core_entity_id) == 'on' %}
                 * **Core** {{ state_attr(core_entity_id,"current_version") }} -> {{ state_attr(core_entity_id,"newest_version") }}  [`PRE-CHECK LOG`](/hassio/addon/core_check_config/logs)
                   {% endif %}
