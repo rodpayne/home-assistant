@@ -51,6 +51,36 @@ FYI, this is what my installed dimmer switch looks like:
 
 ![Dimmer as installed](docs/images/installed-wd200-hardware2.png)
 
+### **Manual Installation Hints**
+<details>
+  <summary> Click for Details</summary>
+
+I wish there were an easy way to explain how to add a custom card.  Some of it depends on whether you are configuring Lovelace in YAML or in the dashboard.  It would be easy if I restructure my repositories for installation using HACS, which I will probably do one of these days.
+
+Manually:
+
+1. Create a `www` subfolder under your `config` folder if there isn't one there already.
+2. Copy [homeseer-wd200-status-card.js](https://raw.githubusercontent.com/rodpayne/home-assistant/main/.homeassistant/www/homeseer-wd200-status-card.js) to the `config/www` folder.
+3. Add a resource entry.  This is where it gets complicated depending on how you are set up.
+4. Reload Resources in the dashboard.
+5. Add a card configuration.
+
+Resource entry example in `configuration.yaml` if using YAML mode:
+```
+lovelace:
+  mode: yaml
+  resources:
+    - url: /local/homeseer-wd200-status-card.js
+      type: module
+```  
+For UI (non-YAML) mode:
+1. Click your name in the lower-left corner to get your profile.
+2. Turn on `Advanced Mode`.
+3. Go to `Settings` > `Dashboards` > click the three dots menu and pick `Resources`.
+3. Click `Add Resource` and add the resource.
+If you get "You are using your dashboard in YAML mode...", then do it like the YAML mode example.
+</details>
+
 ## **Set State**
 Python Script to set the state or other attributes for the specified entity.
 
