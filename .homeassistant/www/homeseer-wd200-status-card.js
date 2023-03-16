@@ -1,6 +1,6 @@
 
 var CARDNAME = "homeseer-wd200-status-card";
-var VERSION = "2023.02.24";
+var VERSION = "2023.03.15";
 var MODEL = "HS-WD200+";
 var DESCRIPTION = "This card shows the status of the seven LEDs on the HS-WD200+ dimmer switch connected using zwave_js.";
 var DOC_URL = "https://github.com/rodpayne/home-assistant#lovelace-homeseer-wd200-card";
@@ -9,10 +9,10 @@ var DOC_URL = "https://github.com/rodpayne/home-assistant#lovelace-homeseer-wd20
 // import { dump } from "js-yaml";
 // import { css, CSSResultGroup, html, LitElement, TemplateResult } from "lit";
 // import { dump } from "https://raw.githubusercontent.com/nodeca/js-yaml/master/dist/js-yaml.min.js";
-import { 
-  LitElement, 
-  html,
-} from "https://unpkg.com/lit?module";
+var LitElement =
+  LitElement ||
+  Object.getPrototypeOf(customElements.get("hui-warning"));
+var html = LitElement.prototype.html;
 
 class HomeSeerWD200StatusCard extends HTMLElement {
 
