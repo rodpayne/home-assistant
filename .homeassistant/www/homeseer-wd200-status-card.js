@@ -1,10 +1,10 @@
 
 var CARDNAME = "homeseer-wd200-status-card";
-var VERSION = "2023.03.15";
-var MODEL = "HS-WD200+";
-var DESCRIPTION = "This card shows the status of the seven LEDs on the HS-WD200+ dimmer switch connected using zwave_js.";
+var VERSION = "2023.12.07";
+var OLDMODEL = "HS-WD200+";
+var MODEL = "HS-WX300";
+var DESCRIPTION = "This card shows the status of the seven LEDs on the HS-WD200+ or HS-WX300 dimmer switch connected using zwave_js.";
 var DOC_URL = "https://github.com/rodpayne/home-assistant#lovelace-homeseer-wd200-card";
-
 
 // import { dump } from "js-yaml";
 // import { css, CSSResultGroup, html, LitElement, TemplateResult } from "lit";
@@ -33,7 +33,7 @@ class HomeSeerWD200StatusCard extends HTMLElement {
       var entityId;
       var state;
       var friendlyName;
-      if (typeof this._config.entity_id ==='undefined' || !this._config.entity_id) {
+      if (typeof this._config.entity_id === 'undefined' || !this._config.entity_id) {
         //  let message = 'You need to define an entity_id.';
         //  this._showError(message);
         //  return
@@ -51,7 +51,7 @@ class HomeSeerWD200StatusCard extends HTMLElement {
       this.zwave_device_id = this._config.zwave_device_id;
       this.zwave_node_id = this._config.zwave_node_id;
       var callResult;
-      if ( (typeof this.zwave_device_id === 'undefined') || (typeof this.zwave_node_id === 'undefined') || (!this.zwave_device_id) || (!this.zwave_node_id) ) {
+      if ((typeof this.zwave_device_id === 'undefined') || (typeof this.zwave_node_id === 'undefined') || (!this.zwave_device_id) || (!this.zwave_node_id)) {
         // ----------------------------------------------------------------------
         //  Retrieve zwave_device_id and zwave_node_id from the device registry:
         // ----------------------------------------------------------------------
@@ -59,27 +59,27 @@ class HomeSeerWD200StatusCard extends HTMLElement {
           type: "config/device_registry/list",
         })
         var deviceList = callResult.filter(obj => {
-          return obj.model === MODEL && obj.identifiers[0][0] === 'zwave_js';
+          return (obj.model === MODEL || obj.model === OLDMODEL) && obj.identifiers[0][0] === 'zwave_js';
         })
-        if (!deviceList) {
-          this._showError("No model " + MODEL + " devices were found.");
+        if (!deviceList || deviceList.length == 0) {
+          this._showError("No model " + OLDMODEL + "/" + MODEL + " devices were found.");
           return;
         }
         console.debug("deviceList = ", deviceList);
         /* default to the first or only device */
         var selectedDevice = deviceList[0];
         this.zwave_device_id = deviceList[0].id;
-        this.zwave_node_id = +deviceList[0].identifiers[0][1].split('-')[1];  
+        this.zwave_node_id = +deviceList[0].identifiers[0][1].split('-')[1];
         /* look for one that matches the entity_id friendlyName */
         var device = _zwaveDeviceThatMatchesName(deviceList, friendlyName)
         if (device) {
-          selectedDevice = device;          
+          selectedDevice = device;
         } else {
-          let entityNameMismatch = friendlyName ? "No model " + MODEL + " devices with name " + friendlyName + " were found. " : "";
-          let entityIdSpecified = (entityId) ? 
-          "You may need to specify zwave_device_id and zwave_node_id configuration parameters " +
+          let entityNameMismatch = friendlyName ? "No model " + OLDMODEL + "/" + MODEL + " devices with name " + friendlyName + " were found. " : "";
+          let entityIdSpecified = (entityId) ?
+            "You may need to specify zwave_device_id and zwave_node_id configuration parameters " +
             "or rename device so that device name and entity friendly name match." :
-            MODEL + " device with name " + selectedDevice['name_by_user'] + " was selected. "
+            OLDMODEL + "/" + MODEL + " device with name " + selectedDevice['name_by_user'] + " was selected. "
           let deviceSpecifiedInConfig = (entityId || this._config.zwave_device_id || this._config.zwave_node_id) ? "" : "Specify either entity_id or zwave_device_id and zwave_node_id. ";
           console.warn(entityNameMismatch + entityIdSpecified + deviceSpecifiedInConfig);
         }
@@ -92,7 +92,7 @@ class HomeSeerWD200StatusCard extends HTMLElement {
           <ha-card header="${title}">
             <div class="card-content"></div>
           </ha-card>`;
-        this.content = this.querySelector('div');  
+        this.content = this.querySelector('div');
       }
     } else if ((new Date() - this._timeDisplayed) <= 1000) {
       // ---- update no more frequently than every second
@@ -206,11 +206,11 @@ class HomeSeerWD200StatusCard extends HTMLElement {
       return;
     };
     this._render(false)
-    .catch(err => {
-      console.debug("error caught in _render"); 
-      console.debug(err); 
-      this._showError("Exception rendering card: " + err.message);
-    });
+      .catch(err => {
+        console.debug("error caught in _render");
+        console.debug(err);
+        this._showError("Exception rendering card: " + err.message);
+      });
   }
 
   // =================================================================
@@ -324,11 +324,11 @@ class HomeSeerWD200StatusCard extends HTMLElement {
     };
 
     this._render(true)
-    .catch(err => {
-      console.debug("error caught in _render"); 
-      console.debug(err); 
-      this._showError("Exception rendering card: " + err.message);
-    });
+      .catch(err => {
+        console.debug("error caught in _render");
+        console.debug(err);
+        this._showError("Exception rendering card: " + err.message);
+      });
 
   }
 
@@ -348,7 +348,7 @@ class HomeSeerWD200StatusCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { 
+    return {
       entity_id: "",
       zwave_device_id: "",
       zwave_node_id: "",
@@ -371,14 +371,14 @@ class HomeSeerWD200StatusCardEditor extends LitElement {
   // setConfig works the same way as for the card itself
   async setConfig(config) {
     this._config = config;
-  //  this._selector = 0;
+    //  this._selector = 0;
 
     // https://github.com/thomasloven/hass-config/wiki/PreLoading-Lovelace-Elements
     if (!customElements.get("ha-entity-picker") || !customElements.get("ha-selector-text")) {
       console.debug("preloading helpers");
       // First we get an entities card element
       const cardHelpers = await window.loadCardHelpers();
-      const entitiesCard = await cardHelpers.createCardElement({type: "entities", entities: []}); // A valid config avoids errors
+      const entitiesCard = await cardHelpers.createCardElement({ type: "entities", entities: [] }); // A valid config avoids errors
       // Then we make it load its editor through the static getConfigElement method
       entitiesCard.constructor.getConfigElement();
     }
@@ -422,14 +422,14 @@ class HomeSeerWD200StatusCardEditor extends LitElement {
       @value-changed=${this.entityChanged}
     ></ha-entity-picker>
     `;
-//    <ha-selector-text
-//      label="Title"
-//      allow-custom-entity
-//      .required=false
-//      .hass=${this.hass}
-//      .value=${this._config.title}
-//      .selector=${this._selector}
-//    ></ha-selector-text>
+    //    <ha-selector-text
+    //      label="Title"
+    //      allow-custom-entity
+    //      .required=false
+    //      .hass=${this.hass}
+    //      .value=${this._config.title}
+    //      .selector=${this._selector}
+    //    ></ha-selector-text>
   }
 }
 

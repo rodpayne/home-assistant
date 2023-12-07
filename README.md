@@ -15,8 +15,8 @@ I have the following camera related components installed in my configuration.
 [www/camera_video.html](https://github.com/rodpayne/home-assistant/blob/main/.homeassistant/www/camera_video.html) | This webpage displays the video from a security camera.  It uses a variety of technologies to find one that will work in a particular browser and keeps it running. | Can be used in a Lovelace [Webpage (iframe) card](https://www.home-assistant.io/lovelace/iframe/) or panel, as an [iframe-fullscreen custom panel](https://www.technicallywizardry.com/home-assistant-custom-panels/), or stand-alone in a browser.  |
 
 
-## **Lovelace HomeSeer WD200+ Card**
-This card shows the status of the seven LEDs on the HS-WD200+ dimmer switch connected using `zwave_js`. The color and blinking of the LEDs are set as configuration parameters of the Z-Wave device and the current `zwave_js` integration does not reveal them in attributes of a sensor (yet?), so this was kind of a challenge for me.
+## **Lovelace HomeSeer WD200+/WX300 Card**
+This card shows the status of the seven LEDs on the HS-WD200+ or HS-WX300-R2 dimmer switch connected using `zwave_js`. The color and blinking of the LEDs are set as configuration parameters of the Z-Wave device and the current `zwave_js` integration does not reveal them in attributes of a sensor (yet?), so this was kind of a challenge for me.
 
 The code is at: [www/homeseer-wd200-status-card.js](https://raw.githubusercontent.com/rodpayne/home-assistant/main/.homeassistant/www/homeseer-wd200-status-card.js)
 
